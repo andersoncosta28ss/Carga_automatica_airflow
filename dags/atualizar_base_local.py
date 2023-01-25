@@ -6,6 +6,25 @@ from airflow.decorators import task
 from airflow.providers.http.operators.http import SimpleHttpOperator
 from airflow.operators.bash import BashOperator
 
+# conexao_local = {"host":"host.docker.internal", "user":"root", "password":"1234", "database":"local"}
+# conexao_bq = {"host":"host.docker.internal", "user":"root", "password":"1234", "database":"bq"}
+
+def getConexaoLocal():
+    return mysql.connector.connect(
+        host="host.docker.internal", 
+        user="root", 
+        password="1234", 
+        database="local"
+        )
+
+def getConexaoBQ():
+    return mysql.connector.connect(
+        host="host.docker.internal", 
+        user="root", 
+        password="1234", 
+        database="bq"
+        )
+
 with DAG(
     dag_id="atualizar_base_local",
     start_date=datetime(2022, 1, 1),    
@@ -14,7 +33,7 @@ with DAG(
 
     @task(task_id="PegarCargasPendentes")
     def PegarCargasPendentes():
-        db = mysql.connector.connect(host="host.docker.internal", user="root", password="1234", database="local")
+        db = getConexaoLocal()
         cursor = db.cursor()
         cursor.execute("SELECT id FROM charge WHERE status = 'Running'")
         idsCarga = cursor.fetchall()
@@ -24,8 +43,7 @@ with DAG(
     @task(task_id="CapturarJobsPendentes")
     def CapturarJobsPendentes_Local(ti=None):
         idsCarga = ti.xcom_pull(task_ids="PegarCargasPendentes")
-        db = mysql.connector.connect(
-            host="host.docker.internal", user="root", password="1234", database="local")
+        db = getConexaoLocal()
         cursor = db.cursor()
         jobsPendentes = []
         for idCarga in idsCarga:
@@ -43,10 +61,10 @@ with DAG(
         def MapearIds(x):
             return str(f"'{x[0]}'")
 
-        jobsId = map(MapearIds, jobsPendentes)
-        db = mysql.connector.connect(host="host.docker.internal", user="root", password="1234", database="bq")
+        jobsId = ','.join(map(MapearIds, jobsPendentes))
+        db = getConexaoBQ()
         cursor = db.cursor()
-        query = (f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE id IN ({','.join(jobsId)})")
+        query = (f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE id IN ({jobsId})")
         cursor.execute(query)
         result = cursor.fetchall()
         db.close()
@@ -54,7 +72,7 @@ with DAG(
 
     @task
     def AtualizarBancoLocal(ti=None):
-        db = mysql.connector.connect(host="host.docker.internal", user="root", password="1234", database="local")
+        db = getConexaoLocal()
         cursor = db.cursor()
         jobsEmProducao = ti.xcom_pull(task_ids="VerificarJobsPendentesNoBancoExterno")
         for jobs in jobsEmProducao:
@@ -62,14 +80,15 @@ with DAG(
             print(query)
             cursor.execute(query)
         db.commit()
+        db.close()
 
     @task
-    def VerificarCargas(ti=None):
+    def TratarCargas(ti=None):
         idsCarga = ti.xcom_pull(task_ids="PegarCargasPendentes")
-        db = mysql.connector.connect(host="host.docker.internal", user="root", password="1234", database="local")
+        db = getConexaoLocal()
         cursor = db.cursor()
         for idCarga in idsCarga:
-            query = (f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE id_charge = '{idCarga}")
+            query = (f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE id_charge = '{idCarga[0]}'")
             cursor.execute(query)
             jobs = cursor.fetchall()
             jobs_EmFila = list(filter(Filter_Queue, jobs))
@@ -77,23 +96,23 @@ with DAG(
             jobs_FalhosPorExcessoDeTentativa = list(filter(Filter_OverTryFailure, jobs))
             jobs_Rodando = list(filter(Filter_Running, jobs))
             jobs_pendentes = len(jobs_EmFila) > 0 | len(jobs_Falhos) > 0 | len(jobs_Rodando) > 0
-            if (jobs_Falhos > 0):
+            if (len(jobs_Falhos) > 0):
                 ReenviarJobs()
             
             if (jobs_pendentes):
                 continue
 
             else:
-                AtualizarCargas()
+                AtualizarCargas(idCarga, len(jobs_FalhosPorExcessoDeTentativa) > 0)
 
     def ReenviarJobs():
         pass            
+    
+    def AtualizarCargas(idCarga: str, parcialmenteCompleto: bool):
+        # Atualiza a idCarga para o status recebido pelo segundo parâmetro
+        pass
 
-    @task
-    def AtualizarCargas(ti=None):
-        pass    
-
-    PegarCargasPendentes() >> CapturarJobsPendentes_Local() >> VerificarJobsPendentesNoBancoExterno() >> AtualizarBancoLocal() >> VerificarCargas()
+    PegarCargasPendentes() >> CapturarJobsPendentes_Local() >> VerificarJobsPendentesNoBancoExterno() >> AtualizarBancoLocal() >> TratarCargas()
 
 
 def Filter_Queue(job):
@@ -103,7 +122,7 @@ def Filter_Running(job):
     return job[1] == 'Running'
 
 def Filter_Failed(job):
-    return job[1] == 'Failed' & job[3] < 3
+    return job[1] == 'Failed' and job[3] < 3
 
 def Filter_OverTryFailure(job):
-    return job[1] == 'Failed' & job[3] >= 3
+    return job[1] == 'Failed' and job[3] >= 3
