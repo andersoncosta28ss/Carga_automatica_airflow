@@ -2,9 +2,8 @@ from datetime import datetime
 from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
-from utils import getConexaoBQ, getConexaoLocal
+from utils import getConexaoLocal, getConexaoBQ
 from uuid import uuid4
-
 
 with DAG(
     dag_id="receber_credenciais",
@@ -22,40 +21,34 @@ with DAG(
         db.close()
         return PokeReturnValue(is_done=len(value) > 0, xcom_value=value)
 
-    @task(task_id="CriarCarga")
-    def CriarCarga(ti=None):
-        credenciais = ti.xcom_pull(task_ids="VerificarSeExisteCredencialNova")
-        db = getConexaoBQ()
-        cursor = db.cursor()
-        uuidList = []
-        for credencial in credenciais:
-            charge_uuid = str(uuid4())
-            uuidList.append(charge_uuid)
-            query = f"INSERT INTO charge (id, credential_id) values('{charge_uuid}', '{credencial[0]}')"
-            cursor.execute(query)
-        db.commit()
-        db.close()
-        return uuidList
-
     @task(task_id="Enviar_Para_RoberthAPI")
-    def Enviar_Para_RoberthAPI():
-        jobsId = []
-        for i in range(0, 12):
-            jobsId.append(str(uuid4()))
-        return jobsId
+    def Enviar_Para_RoberthAPI(ti=None):
+        import requests
+        credenciais = ti.xcom_pull(task_ids="VerificarSeExisteCredencialNova")
+        cargas = []
+        for credencial in credenciais:
+            idCarga = str(uuid4())
+            idCredencial = credencial[0]            
+            request = requests.get(f"http://host.docker.internal:3005/criar_carga2?id_charge={idCarga}&id_credential={idCredencial}")
+            jobsId = request.json()
+            cargas.append({"idCarga": idCarga, "idCredencial": idCredencial, "idJobs": jobsId})
+        return cargas
 
     @task
     def GuardarJobsLocalmente(ti=None):
-        idCargas = ti.xcom_pull(task_ids="CriarCarga")
-        idJobs = ti.xcom_pull(task_ids="Enviar_Para_RoberthAPI")
-        db = getConexaoBQ()
+        cargas = ti.xcom_pull(task_ids="Enviar_Para_RoberthAPI")
+        db = getConexaoLocal()
         cursor = db.cursor()
-        for idCarga in idCargas:
-            for idjob in idJobs:
-                query = f"INSERT INTO job (id, id_charge) values('{idjob}', '{idCarga}')"
+        for carga in cargas:
+            idCarga = carga['idCarga']
+            idCredencial = carga['idCredencial']
+            jobsId = carga['idJobs']
+            query = f"INSERT INTO charge (id, credential_id) values('{idCarga}', '{idCredencial}')"
+            cursor.execute(query)
+            for idJob in jobsId:
+                query = f"INSERT INTO job (id, id_charge) values('{idJob}', '{idCarga}')"
                 cursor.execute(query)
         db.commit()
         db.close()
 
-    Sensor_VerificarSeExisteCredencialNova() >> CriarCarga(
-    ) >> Enviar_Para_RoberthAPI() >> GuardarJobsLocalmente()
+    Sensor_VerificarSeExisteCredencialNova() >> Enviar_Para_RoberthAPI() >> GuardarJobsLocalmente()

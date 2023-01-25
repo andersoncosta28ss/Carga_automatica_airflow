@@ -4,7 +4,7 @@ from airflow import DAG
 from airflow.decorators import task
 from airflow.providers.http.operators.http import SimpleHttpOperator
 from airflow.operators.bash import BashOperator
-from utils import getConexaoBQ, getConexaoLocal, Filter_Queue, Filter_Running, Filter_Failed, Filter_OverTryFailure
+from utils import getConexaoLocal, getConexaoBQ, Filter_Queue, Filter_Running, Filter_Failed, Filter_OverTryFailure
 
 with DAG(
     dag_id="atualizar_base_local",

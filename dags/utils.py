@@ -8,7 +8,7 @@ def getConexaoLocal():
         user="root", 
         password="1234", 
         database="local"
-        )
+    )
 
 def getConexaoBQ():
     return mysql.connector.connect(
@@ -16,7 +16,7 @@ def getConexaoBQ():
         user="root", 
         password="1234", 
         database="bq"
-        )
+    )
 
 def Filter_Queue(job):
     return job[1] == 'Queue'
