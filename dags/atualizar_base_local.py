@@ -84,13 +84,11 @@ with DAG(
                 continue
 
             else:
-                AtualizarCargas(idCarga, len(
-                    jobs_FalhosPorExcessoDeTentativa) > 0)
+                AtualizarCargas(idCarga, len(jobs_FalhosPorExcessoDeTentativa) > 0)
 
     def ReenviarJobs(idCarga):
         import requests
-        request = requests.get(
-            url_base_base + "resend_jobs_failed/?" + "id_charge=" + idCarga)
+        request = requests.get(url_base_base + "resend_jobs_failed/?" + "id_charge=" + idCarga)
         result = request.json()
         db = getConexaoLocal()
         cursor = db.cursor()
@@ -115,8 +113,7 @@ with DAG(
         cursor.execute(query)
         db.commit()
         db.close()        
-        request = requests.get(f"{url_base_base}updateStateOfCharge/?id_charge={idCarga}&state={state}")
-        print(request.content)
+        requests.get(f"{url_base_base}updateStateOfCharge/?id_charge={idCarga}&state={state}")
 
     PegarCargasPendentes() >> CapturarJobsPendentes_Local(
     ) >> VerificarJobsPendentesNoBancoExterno() >> AtualizarBancoLocal() >> TratarCargas()

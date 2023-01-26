@@ -1,8 +1,6 @@
 import mysql.connector
 
 url_base_base = "http://host.docker.internal:3005/"
-# conexao_local = {"host":"host.docker.internal", "user":"root", "password":"1234", "database":"local"}
-# conexao_bq = {"host":"host.docker.internal", "user":"root", "password":"1234", "database":"bq"}
 
 def getConexaoLocal():
     return mysql.connector.connect(
@@ -35,7 +33,7 @@ def Filter_Running(job):
     return job[1] == 'Running'
 
 def Filter_Failed(job):
-    return job[1] == 'Failed' and job[3] < 3 and job[2] == False
+    return job[1] == 'Failed' and job[3] > 0 and job[2] == False
 
 def Filter_OverTryFailure(job):
-    return job[1] == 'Failed' and job[3] >= 3
+    return job[1] == 'Failed' and job[3] <= 0
