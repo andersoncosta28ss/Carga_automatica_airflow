@@ -20,32 +20,24 @@ with DAG(
         credenciais = cursor.fetchall()
         db.close()
         credenciais = VerificarSeExisteCargaComEssasCredenciais(credenciais)
-        
         return PokeReturnValue(is_done=len(credenciais) > 0, xcom_value=credenciais)
 
-    
     def VerificarSeExisteCargaComEssasCredenciais(credenciais):
         credenciaisParaProsseguir = []
+
         for credencial in credenciais:
-            db = getConexaoLocal() 
+            db = getConexaoLocal()
             cursor = db.cursor()
             query = f"SELECT * FROM charge WHERE credential_id = {credencial[0]}"
             cursor.execute(query)
             consultaInterna = cursor.fetchall()
-            print(consultaInterna)
             if (len(consultaInterna) > 0):
                 db.close()
                 continue
-
             else:
-                query = f"INSERT INTO credential(id, name) VALUES({credencial[0]}, '{credencial[1]}')"
-                print(query)
-                cursor.execute(query)
-                db.commit()
                 credenciaisParaProsseguir.append(credencial)
             db.close()
         return credenciaisParaProsseguir
-        
 
     @task(task_id="Enviar_Para_RoberthAPI")
     def Enviar_Para_RoberthAPI(ti=None):
@@ -55,11 +47,10 @@ with DAG(
         for credencial in credenciais:
             idCarga = str(uuid4())
             idCredencial = credencial[0]
-            request = requests.get(
-                f"http://host.docker.internal:3005/criar_carga2?id_charge={idCarga}&id_credential={idCredencial}")
+            nomeCredencial = credencial[1]
+            request = requests.get(f"http://host.docker.internal:3005/criar_carga2?id_charge={idCarga}&id_credential={idCredencial}")
             jobsId = request.json()
-            cargas.append(
-                {"idCarga": idCarga, "idCredencial": idCredencial, "idJobs": jobsId})
+            cargas.append({"idCarga": idCarga, "idCredencial": idCredencial, "nomeCredencial": nomeCredencial, "idJobs": jobsId})
         return cargas
 
     @task
@@ -71,6 +62,10 @@ with DAG(
             idCarga = carga['idCarga']
             idCredencial = carga['idCredencial']
             jobsId = carga['idJobs']
+            nomeCredencial = carga['nomeCredencial']
+            query = f"INSERT INTO credential(id, name) VALUES({idCredencial}, '{nomeCredencial}')"
+            cursor.execute(query)
+            db.commit()
             query = f"INSERT INTO charge (id, credential_id) values('{idCarga}', '{idCredencial}')"
             cursor.execute(query)
             for idJob in jobsId:
@@ -79,5 +74,4 @@ with DAG(
         db.commit()
         db.close()
 
-    Sensor_VerificarSeExisteCredencialNova(
-    ) >> Enviar_Para_RoberthAPI() >> GuardarJobsLocalmente()
+    Sensor_VerificarSeExisteCredencialNova() >> Enviar_Para_RoberthAPI() >> GuardarJobsLocalmente()
