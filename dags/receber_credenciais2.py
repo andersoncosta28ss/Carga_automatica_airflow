@@ -5,9 +5,10 @@ from airflow.sensors.base import PokeReturnValue
 from db_connections import getConexaoLocal, getConexaoBQ
 from db_query import Local_InsertJobs, Local_InsertCharge, Local_InsertCredential, Local_SelectCrendetial, BQ_SelectCredential
 from uuid import uuid4
+from airflow.models import Variable
 
 with DAG(
-    dag_id="1_receber_credenciais",
+    dag_id="2_receber_credenciais",
     start_date=datetime(2022, 1, 1),
     schedule_interval="@hourly",
     max_active_runs=1
