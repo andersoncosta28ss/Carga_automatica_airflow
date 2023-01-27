@@ -41,11 +41,6 @@ def Local_SelectCrendetial(idCredencial):
 def BQ_SelectJobs(jobsId):
     return f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE id IN ({jobsId})"
 
-def BQ_SelectCredential():
+def Prod_SelectCredential():
     return "SELECT id FROM credential WHERE create_at >= DATE_SUB(NOW(), interval 30 SECOND)"
-#endregion
-
-#region Stage
-def BQ_SelectCredential():
-    return 
 #endregion

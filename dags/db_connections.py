@@ -8,7 +8,7 @@ def getConexaoLocal():
         database="local"
     )
 
-def getConexaoBQ():
+def getConexaoProd():
     return mysql.connector.connect(
         host="host.docker.internal", 
         user="root", 

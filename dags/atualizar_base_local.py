@@ -2,12 +2,10 @@ from datetime import datetime
 from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
-from db_connections import getConexaoLocal, getConexaoBQ
+from db_connections import getConexaoLocal, getConexaoProd
 from functions_list import Filter_Queue, Filter_Running, Filter_Failed, Filter_OverTryFailure
-from db_query import Local_InsertJobResents, Local_UpdateCharge, Local_SelectJobsFromIdCharge, BQ_SelectJobs, Local_UpdateJob
-import requests
-
-url_base_base = "http://host.docker.internal:3005/"
+from api_functions import ResendJobs
+from db_functions import Local_InsertJobsResend, Local_Find_PendingCharges, Local_Find_PendingChargesByCharge, BQ_Find_JobsByIds, Local_UpdateJobs, Local_UpdateCharge
 
 with DAG(
     dag_id="1_atualizar_base_local",
@@ -18,106 +16,55 @@ with DAG(
 
     @task.sensor(poke_interval=10, timeout=3600, mode="reschedule", soft_fail=True, task_id="PegarCargasPendentes")
     def PegarCargasPendentes() -> PokeReturnValue:
-        db = getConexaoLocal()
-        cursor = db.cursor()
-        query = "SELECT id FROM charge WHERE status = 'Running'"
-        cursor.execute(query)
-        idsCarga = cursor.fetchall()
-        db.close()
-        return PokeReturnValue(is_done=len(idsCarga) > 0, xcom_value=idsCarga)
+        idCharge = Local_Find_PendingCharges()
+        return PokeReturnValue(is_done=len(idCharge) > 0, xcom_value=idCharge)
 
     @task(task_id="CapturarJobsPendentes")
     def CapturarJobsPendentes_Local(ti=None):
-        idsCarga = ti.xcom_pull(task_ids="PegarCargasPendentes")
-        db = getConexaoLocal()
-        cursor = db.cursor()
-        jobsPendentes = []
-        for idCarga in idsCarga:
-            query = Local_SelectJobsFromIdCharge(idCarga[0])
-            cursor.execute(query)
-            jobsPendentes += cursor.fetchall()
-        db.close()
-        return jobsPendentes
+        idCharges = ti.xcom_pull(task_ids="PegarCargasPendentes")
+        return Local_Find_PendingChargesByCharge(idCharges)
 
     @task(task_id="VerificarJobsPendentesNoBancoExterno")
     def VerificarJobsPendentesNoBancoExterno(ti=None):
-        jobsPendentes = ti.xcom_pull(task_ids="CapturarJobsPendentes")
-        db = getConexaoBQ()
-        cursor = db.cursor()
-
-        def MapearIds(x):
-            return str(f"'{x[0]}'")
-
-        jobsId = ','.join(map(MapearIds, jobsPendentes))
-        query = BQ_SelectJobs(jobsId)
-        print(query)
-        cursor.execute(query)
-        result = cursor.fetchall()
-        db.close()
-        return result
+        jobsPendentes = ti.xcom_pull(task_ids="CapturarJobsPendentes")        
+        return BQ_Find_JobsByIds(jobsPendentes)
 
     @task
-    def AtualizarBancoLocal(ti=None):
-        db = getConexaoLocal()
-        cursor = db.cursor()
-        jobsEmProducao = ti.xcom_pull(
-            task_ids="VerificarJobsPendentesNoBancoExterno")
-        for job in jobsEmProducao:
-            query = Local_UpdateJob(job)
-            cursor.execute(query)
-        db.commit()
-        db.close()
+    def AtualizarBancoLocal(ti=None):  
+        jobsEmProducao = ti.xcom_pull(task_ids="VerificarJobsPendentesNoBancoExterno")
+        Local_UpdateJobs(jobsEmProducao)
 
     @task
     def TratarCargas(ti=None):
-        cargas = ti.xcom_pull(task_ids="PegarCargasPendentes")
-        db = getConexaoLocal()
-        cursor = db.cursor()
-        for carga in cargas:
-            idCarga = carga[0]
-            query = (Local_SelectJobsFromIdCharge(idCarga))
-            cursor.execute(query)
-            jobs = cursor.fetchall()
+        charges = ti.xcom_pull(task_ids="PegarCargasPendentes")
+        for charge in charges:
+            idCharge = charge[0]
+            jobs = Local_Find_PendingChargesByCharge(idCharge)
             jobs_EmFila = list(filter(Filter_Queue, jobs))
             jobs_Falhos = list(filter(Filter_Failed, jobs))
             jobs_FalhosPorExcessoDeTentativa = list(
                 filter(Filter_OverTryFailure, jobs))
             jobs_Rodando = list(filter(Filter_Running, jobs))
-            jobs_pendentes = len(jobs_EmFila) > 0 or len(
-                jobs_Falhos) > 0 or len(jobs_Rodando) > 0
+            jobs_pendentes = len(jobs_EmFila) > 0 or len(jobs_Falhos) > 0 or len(jobs_Rodando) > 0
             if (len(jobs_Falhos) > 0):
-                ReenviarJobs(idCarga)
+                ReenviarJobs(idCharge)
 
             if (jobs_pendentes):
                 continue
 
             else:
-                AtualizarCargas(idCarga, len(
+                AtualizarCargas(idCharge, len(
                     jobs_FalhosPorExcessoDeTentativa) > 0)
 
-    def ReenviarJobs(idCarga):
-        import requests
-        request = requests.get(
-            url_base_base + "resend_jobs_failed/?" + "id_charge=" + idCarga)
-        result = request.json()
-        db = getConexaoLocal()
-        cursor = db.cursor()
-        for job in result:
-            query = Local_InsertJobResents(job)
-            cursor.execute(query)
-        db.commit()
-        db.close()
+    def ReenviarJobs(idCharge):
+        jobs = ResendJobs(idCharge)
+        Local_InsertJobsResend(jobs)
 
-    def AtualizarCargas(idCarga: str, parcialmenteCompleto: bool):
+    def AtualizarCargas(idCharge: str, parcialmenteCompleto: bool):
+        import requests
         state = 'Partially_Done' if parcialmenteCompleto else 'Done'
-        db = getConexaoLocal()
-        cursor = db.cursor()
-        query = Local_UpdateCharge(idCarga, state)
-        cursor.execute(query)
-        db.commit()
-        db.close()
-        requests.get(
-            f"{url_base_base}updateStateOfCharge/?id_charge={idCarga}&state={state}")
+        Local_UpdateCharge(idCharge, state)
+        requests.get(f"http://host.docker.internal:3005/updateStateOfCharge/?id_charge={idCharge}&state={state}")
 
     PegarCargasPendentes() >> CapturarJobsPendentes_Local(
     ) >> VerificarJobsPendentesNoBancoExterno() >> AtualizarBancoLocal() >> TratarCargas()
