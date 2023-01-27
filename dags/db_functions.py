@@ -1,10 +1,14 @@
-from db_connections import getConexaoLocal, getConexaoProd
-from db_query import Local_InsertJobs, Local_InsertCharge, Local_InsertCredential, Local_SelectCrendetial, Prod_SelectCredential, Local_InsertJobResents, Local_SelectJobsFromIdCharge, BQ_SelectJobs, Local_UpdateJob, Local_UpdateCharge as Query_LocalUpdateCharge
+from db_connections import getConexaoLocal, getConexaoProd, getConexaoStage
+from db_query import Query_Local_InsertJobs, Query_Local_InsertCharge, Query_Local_InsertCredential, Query_Local_SelectCrendetial, Query_Prod_SelectCredential, Query_Local_InsertJobResents, Query_Local_SelectJobsFromIdCharge, Query_BQ_SelectJobs, Query_Local_UpdateJob, Query_Local_UpdateCharge as Query_LocalUpdateCharge
 
-def Prod_Find_credentials():
-    db = getConexaoProd()
-    cursor = db.cursor()
-    query = Prod_SelectCredential()
+def Prod_Find_credentials(envs = None):
+    if (envs is None):
+        db = getConexaoProd()
+        query = Query_Prod_SelectCredential()
+    else:
+        db = getConexaoStage(envs)
+        query = "SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), interval 30 SECOND)" 
+    cursor = db.cursor()    
     cursor.execute(query)
     credentials = cursor.fetchall()
     db.close()
@@ -12,19 +16,19 @@ def Prod_Find_credentials():
 
 def Local_Filter_credentials(credentials):
     credentialsToContinue = []
+    db = getConexaoLocal()
+    cursor = db.cursor()
     for credential in credentials:
         idCredential = credential[0]
-        db = getConexaoLocal()
-        cursor = db.cursor()
-        query = Local_SelectCrendetial(idCredential)
+
+        query = Query_Local_SelectCrendetial(idCredential)
         cursor.execute(query)
         consultaInterna = cursor.fetchall()
         if (len(consultaInterna) > 0):
-            db.close()
             continue
         else:
             credentialsToContinue.append(idCredential)
-        db.close()
+    db.close()
     return credentialsToContinue
 
 def Local_CreateCharges(charges):
@@ -34,13 +38,13 @@ def Local_CreateCharges(charges):
         idCharge = charge['idCarga']
         idCredential = charge['idCredencial']
         jobsId = charge['idJobs']
-        query = Local_InsertCredential(idCredential)
+        query = Query_Local_InsertCredential(idCredential)
         cursor.execute(query)
         db.commit()
-        query = Local_InsertCharge(idCharge, idCredential)
+        query = Query_Local_InsertCharge(idCharge, idCredential)
         cursor.execute(query)
         for idJob in jobsId:
-            query = Local_InsertJobs(idJob, idCharge)
+            query = Query_Local_InsertJobs(idJob, idCharge)
             cursor.execute(query)
     db.commit()
     db.close()
@@ -49,7 +53,7 @@ def Local_InsertJobsResend(jobs):
     db = getConexaoLocal()
     cursor = db.cursor()
     for job in jobs:
-        query = Local_InsertJobResents(job)
+        query = Query_Local_InsertJobResents(job)
         cursor.execute(query)
     db.commit()
     db.close()    
@@ -63,16 +67,17 @@ def Local_Find_PendingCharges():
     db.close()
     return idCharges
 
-def Local_Find_PendingChargesByCharge(charges):
+def Local_Find_PendingJobsByCharge(charges):
+    pendingJobs = []
     db = getConexaoLocal()
     cursor = db.cursor()
-    pendingJobs = []
     for charge in charges:
         idCharge = charge[0]
-        query = Local_SelectJobsFromIdCharge(idCharge)
+        query = Query_Local_SelectJobsFromIdCharge(idCharge)
         cursor.execute(query)
         pendingJobs += cursor.fetchall()
     db.close()
+    db.disconnect()
     return pendingJobs
 
 def BQ_Find_JobsByIds(jobs):
@@ -83,7 +88,7 @@ def BQ_Find_JobsByIds(jobs):
         return str(f"'{x[0]}'")
 
     jobsId = ','.join(map(MapearIds, jobs))
-    query = BQ_SelectJobs(jobsId)
+    query = Query_BQ_SelectJobs(jobsId)
     cursor.execute(query)
     result = cursor.fetchall()
     db.close()
@@ -101,7 +106,7 @@ def Local_UpdateJobs(jobs):
     db = getConexaoLocal()
     cursor = db.cursor()
     for job in jobs:
-        query = Local_UpdateJob(job)
+        query = Query_Local_UpdateJob(job)
         cursor.execute(query)
     db.commit()
     db.close()

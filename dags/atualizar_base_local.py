@@ -2,10 +2,11 @@ from datetime import datetime
 from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
-from db_connections import getConexaoLocal, getConexaoProd
+from db_connections import getConexaoLocal
 from functions_list import Filter_Queue, Filter_Running, Filter_Failed, Filter_OverTryFailure
 from api_functions import ResendJobs
-from db_functions import Local_InsertJobsResend, Local_Find_PendingCharges, Local_Find_PendingChargesByCharge, BQ_Find_JobsByIds, Local_UpdateJobs, Local_UpdateCharge
+from db_functions import Local_InsertJobsResend, Local_Find_PendingCharges, Local_Find_PendingJobsByCharge, BQ_Find_JobsByIds, Local_UpdateJobs, Local_UpdateCharge
+from db_query import Query_Local_SelectJobsFromIdCharge
 
 with DAG(
     dag_id="1_atualizar_base_local",
@@ -22,7 +23,7 @@ with DAG(
     @task(task_id="CapturarJobsPendentes")
     def CapturarJobsPendentes_Local(ti=None):
         idCharges = ti.xcom_pull(task_ids="PegarCargasPendentes")
-        return Local_Find_PendingChargesByCharge(idCharges)
+        return Local_Find_PendingJobsByCharge(idCharges)
 
     @task(task_id="VerificarJobsPendentesNoBancoExterno")
     def VerificarJobsPendentesNoBancoExterno(ti=None):
@@ -36,25 +37,30 @@ with DAG(
 
     @task
     def TratarCargas(ti=None):
-        charges = ti.xcom_pull(task_ids="PegarCargasPendentes")
-        for charge in charges:
-            idCharge = charge[0]
-            jobs = Local_Find_PendingChargesByCharge(idCharge)
+        cargas = ti.xcom_pull(task_ids="PegarCargasPendentes")
+        db = getConexaoLocal() # Se tentarmos usar a função de Local_Find_PendingChargesByCharge dá erro de excesso de conexão, sem sentido nenhum
+        cursor = db.cursor()
+        for carga in cargas:
+            idCarga = carga[0]
+            query = (Query_Local_SelectJobsFromIdCharge(idCarga))
+            cursor.execute(query)
+            jobs = cursor.fetchall()
             jobs_EmFila = list(filter(Filter_Queue, jobs))
             jobs_Falhos = list(filter(Filter_Failed, jobs))
-            jobs_FalhosPorExcessoDeTentativa = list(
-                filter(Filter_OverTryFailure, jobs))
+            jobs_FalhosPorExcessoDeTentativa = list(filter(Filter_OverTryFailure, jobs))
             jobs_Rodando = list(filter(Filter_Running, jobs))
-            jobs_pendentes = len(jobs_EmFila) > 0 or len(jobs_Falhos) > 0 or len(jobs_Rodando) > 0
+            jobs_pendentes = len(jobs_EmFila) > 0 or len(
+                jobs_Falhos) > 0 or len(jobs_Rodando) > 0
             if (len(jobs_Falhos) > 0):
-                ReenviarJobs(idCharge)
+                ReenviarJobs(idCarga)
 
             if (jobs_pendentes):
                 continue
 
             else:
-                AtualizarCargas(idCharge, len(
+                AtualizarCargas(idCarga, len(
                     jobs_FalhosPorExcessoDeTentativa) > 0)
+        db.close()
 
     def ReenviarJobs(idCharge):
         jobs = ResendJobs(idCharge)
