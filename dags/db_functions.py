@@ -1,25 +1,14 @@
-from db_connections import getConexaoLocal, getConexaoProd, getConexaoStage
-from db_query import Query_Local_SelectPendingJobs, Query_Local_SelectCrendetial, Query_Prod_SelectCredential, Query_BQ_Select_JobsById, Query_Local_UpdateCharge, Query_BQ_Select_JobsChildrenByIdParent
+from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
+from db_query import Query_Local_SelectCrendetial
 from google.cloud import bigquery
 from functions_list import Map_IdJobs
 
-def Prod_Select_Credentials(envs=None):
-    if (envs is None):
-        db = getConexaoProd()
-        query = Query_Prod_SelectCredential()
-    else:
-        db = getConexaoStage(envs)
-        query = "SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), interval 30 SECOND)"
-    cursor = db.cursor()
-    cursor.execute(query)
-    credentials = cursor.fetchall()
-    db.close()
-    return credentials
+# region Local
 
 
 def Local_Filter_Credentials(credentials):
     credentialsToContinue = []
-    db = getConexaoLocal()
+    db = getConnectionLocal()
     cursor = db.cursor()
     for credential in credentials:
         idCredential = credential[0]
@@ -36,9 +25,9 @@ def Local_Filter_Credentials(credentials):
 
 
 def Local_Select_PendingCharges():
-    db = getConexaoLocal()
+    db = getConnectionLocal()
     cursor = db.cursor()
-    query = "SELECT id FROM charge WHERE status = 'Running'"
+    query = "SELECT id FROM charge WHERE status = 'running'"
     cursor.execute(query)
     idCharges = cursor.fetchall()
     db.close()
@@ -47,10 +36,10 @@ def Local_Select_PendingCharges():
 
 def Local_Select_PendingJobs():
     pendingJobs = []
-    db = getConexaoLocal()
+    db = getConnectionLocal()
     cursor = db.cursor()
-    query = Query_Local_SelectPendingJobs()
-    cursor.execute(query)
+    cursor.execute(
+        f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE was_sent = false AND status NOT IN('done', 'timeout')")
     pendingJobs = cursor.fetchall()
     db.close()
     db.disconnect()
@@ -58,34 +47,88 @@ def Local_Select_PendingJobs():
 
 
 def Local_Update_Charge(idCharge, state):
-    db = getConexaoLocal()
+    db = getConnectionLocal()
     cursor = db.cursor()
-    query = Query_Local_UpdateCharge(idCharge, state)
-    cursor.execute(query)
+    cursor.execute(
+        f"UPDATE charge SET status = '{state}' WHERE id = '{idCharge}'")
     db.commit()
     db.close()
 
+# region somente para ambiente de desenvolvimento
 
-def BQ_Find_JobsByIds(jobs):
-    db = getConexaoProd()
+
+def Local2_Select_JobsByIds(jobs):
+    db = getConnectionLocal2()
     cursor = db.cursor()
     idJobs = ','.join(map(Map_IdJobs, jobs))
-    cursor.execute(Query_BQ_Select_JobsById(idJobs))
+    cursor.execute(
+        f"SELECT id, status, retry, id_parent FROM job WHERE id IN ({idJobs})")
     resultJobs = cursor.fetchall()
     cursor = db.cursor()
     db.close()
     return resultJobs
 
 
-def BQ_Select_JobsChildrenByIdParent(jobs):
+def Local2_Select_JobsChildrenByIdParent(jobs):
     jobsChildren = []
-    db = getConexaoProd()
+    db = getConnectionLocal2()
     cursor = db.cursor()
     idfailedJobs = ','.join(map(Map_IdJobs, jobs))
     if (len(idfailedJobs) > 0):
-        query = Query_BQ_Select_JobsChildrenByIdParent(idfailedJobs)
-        print(query)
-        cursor.execute(query)
+        cursor.execute(
+            f"SELECT id, status, retry, id_parent FROM job WHERE id_parent IN ({idfailedJobs})")
         jobsChildren = cursor.fetchall()
     db.close()
     return jobsChildren
+
+
+def Local2_Select_Credentials():
+    db = getConnectionLocal2()
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id FROM credential WHERE create_at >= DATE_SUB(NOW(), interval 30 SECOND)")
+    credentials = cursor.fetchall()
+    db.close()
+    return credentials
+# endregion
+
+# endregion
+
+# region Prod & BQ
+
+
+def Prod_Select_Credentials(envs):
+    db = getConnectionProd(envs)
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), interval 30 SECOND)")
+    credentials = cursor.fetchall()
+    db.close()
+    return credentials
+
+
+def BQ_Select_JobsByIds(jobs, envs):
+    import json
+    print("---- Começa -----")
+    print(jobs)
+    print(json.loads(envs.get("BQ_JSON")))
+    db = getConnectionBQ(envs)
+    idJobs = ','.join(map(Map_IdJobs, jobs))
+    query_job = db.query(
+        f"SELECT job_id, status, retries, parent_id FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})")
+    result = [list(dict(row).values()) for row in query_job]
+    db.close()
+    return result
+
+
+def BQ_Select_JobsChildrenByIdParent(jobs, envs):
+    jobsChildren = []
+    db = getConnectionBQ(envs)
+    idfailedJobs = ','.join(map(Map_IdJobs, jobs))
+    if (len(idfailedJobs) > 0):
+        query_job = db.query(
+            f"SELECT job_id, status, retries, parent_id FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE id_parent IN ({idfailedJobs})")
+        jobsChildren = [list(dict(row).values()) for row in query_job]
+    db.close()
+    return jobsChildren
+# endregion

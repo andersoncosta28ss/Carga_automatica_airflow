@@ -23,7 +23,7 @@ def Local_ResendJobs(idCharge):
     return result
 
 
-def Prod_SendToAPI(idCredentials):
+def Prod_SendToAPI(idCredentials, envs):
     charges = []
     for idCredencial in idCredentials:
         payload = json.dumps({
@@ -34,9 +34,12 @@ def Prod_SendToAPI(idCredentials):
             "priority": "normal",
             "procedure": [{"script": "{insurer}/contract-fetch", "params": {"pastDays":  1}}]
         })
-        response = requests.request("POST", url, headers=headers, data=payload)
+        response = requests.request("POST", url=envs.get("API_URL"), headers={
+            "Authorization": envs.get("API_AUTHORIZATION"),
+            "Content-Type": "application/json"
+        }, data=payload)
         charge = response.json()
         
         charges.append(
-            {"idCarga": charge["uuid"], "idCredencial": idCredencial, "idJobs": charge["children"]})
+            {"idCarga": charge["uuid"], "idCredencial": idCredencial, "idJobs": charge["children"]})        
     return charges

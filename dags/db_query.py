@@ -1,11 +1,7 @@
-from db_connections import getConexaoLocal
-#region Local
+from db_connections import getConnectionLocal
+# region Local
 def Query_Local_SelectPendingJobs():
-    return f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE was_sent = false AND status <> 'Done'"
-
-def Query_Local_SelectJobsFromIdCharge(idCharge):
-    return f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE id_charge = '{idCharge}' AND status <> 'Done'"
-
+    return f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE was_sent = false AND status <> 'done'"
 
 def Query_Local_InsertChildrenJob(jobs):
     query = ""
@@ -17,7 +13,7 @@ def Query_Local_InsertChildrenJob(jobs):
         retry = job[2]
         id_parent = job[3]
         #region get id_charge
-        db = getConexaoLocal()
+        db = getConnectionLocal()
         cursor = db.cursor()
         cursor.execute(f"SELECT id, status, was_sent, retry, id_parent, id_charge FROM job WHERE id = '{id_parent}'")
         result = cursor.fetchone()
@@ -30,15 +26,15 @@ def Query_Local_InsertChildrenJob(jobs):
         """
     return query
 
-def Query_Local_UpdateCharge(idCharge, state):
-    return f"UPDATE charge SET status = '{state}' WHERE id = '{idCharge}'"
+def Query_Local_SelectJobsFromIdCharge(idCharge):
+    return f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE id_charge = '{idCharge}' AND status <> 'done'"
 
 def Query_Local_UpdateJob(jobs):
     query = ""
     for job in jobs:
-        # was_sent = job[1] == "Failed" and job[2] == 0
         query += f"UPDATE job SET status = '{job[1]}', retry = {job[2]}, id_parent = '{job[3]}' WHERE id = '{job[0]}';"
     return query
+
 
 def Query_Local_InsertCharge(charges):
     query = ""
@@ -52,18 +48,8 @@ def Query_Local_InsertCharge(charges):
             query += f"INSERT INTO job (id, id_charge) values('{idJob}', '{idCharge}');"
     return query
 
+
 def Query_Local_SelectCrendetial(idCredential):
     return f"SELECT * FROM charge WHERE credential_id = {idCredential}"
 
-#endregion
-
-#region BQ
-def Query_BQ_Select_JobsById(idJobs):
-    return f"SELECT id, status, retry, id_parent FROM job WHERE id IN ({idJobs})"
-
-def Query_BQ_Select_JobsChildrenByIdParent(idJob):
-    return f"SELECT id, status, retry, id_parent FROM job WHERE id_parent IN ({idJob})"
-
-def Query_Prod_SelectCredential():
-    return "SELECT id FROM credential WHERE create_at >= DATE_SUB(NOW(), interval 30 SECOND)"
-#endregion
+# endregion

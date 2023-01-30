@@ -2,35 +2,35 @@ from datetime import datetime
 from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
-from db_connections import getConexaoLocal
+from db_connections import getConnectionLocal
 from functions_list import Filter_Queue, Filter_Running, Filter_Failed_Local, Filter_OverTryFailure, Filter_Failed_BQ
-from db_functions import Local_Select_PendingCharges, BQ_Find_JobsByIds, Local_Update_Charge, Local_Select_PendingJobs, BQ_Select_JobsChildrenByIdParent, Local_Select_PendingCharges
+from db_functions import Local_Select_PendingCharges, Local2_Select_JobsByIds, Local_Update_Charge, Local_Select_PendingJobs, Local2_Select_JobsChildrenByIdParent, Local_Select_PendingCharges
 from db_query import Query_Local_SelectJobsFromIdCharge, Query_Local_InsertChildrenJob, Query_Local_UpdateJob
 from airflow.providers.mysql.operators.mysql import MySqlOperator
 
 with DAG(
-    dag_id="1_atualizar_base_local",
+    dag_id="1-desenvolvimento_atualizar_base_local",
     start_date=datetime(2022, 1, 1),
     schedule_interval="@hourly",
     max_active_runs=1,
     default_args={"mysql_conn_id": "local_mysql"},
 ) as dag:
 
-    @task.sensor(poke_interval=10, timeout=3600, mode="reschedule", soft_fail=True, task_id="CapturarJobsPendentes")
+    @task.sensor(poke_interval=10, timeout=3600, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarJobsPendentes")
     def CapturarJobsPendentes() -> PokeReturnValue:
         pendingJobs = Local_Select_PendingJobs()
         return PokeReturnValue(is_done=len(pendingJobs) > 0, xcom_value=pendingJobs)
 
     @task(task_id="PegarJobsPendentesNaBigQuery")
     def PegarJobsPendentesNaBigQuery(ti=None):
-        pendingJobs = ti.xcom_pull(task_ids="CapturarJobsPendentes")
-        return BQ_Find_JobsByIds(pendingJobs)
+        pendingJobs = ti.xcom_pull(task_ids="Sensor_CapturarJobsPendentes")
+        return Local2_Select_JobsByIds(pendingJobs)
 
     @task(task_id="PegarJobsFilhosNaBigQuery")
     def PegarJobsFilhosNaBigQuery(ti=None):
         pendingJobs = ti.xcom_pull(task_ids="PegarJobsPendentesNaBigQuery")
         idFailedJobs = list(filter(Filter_Failed_BQ, pendingJobs))
-        return BQ_Select_JobsChildrenByIdParent(idFailedJobs)
+        return Local2_Select_JobsChildrenByIdParent(idFailedJobs)
 
     @task
     def PrepararSQLs(ti=None):
@@ -57,7 +57,7 @@ with DAG(
     def TratarCargas(ti=None):
         cargas = Local_Select_PendingCharges()
         # Se tentarmos usar a função de Local_Find_PendingChargesByCharge dá erro de excesso de conexão, sem sentido nenhum
-        db = getConexaoLocal()
+        db = getConnectionLocal()
         cursor = db.cursor()
         for carga in cargas:
             idCarga = carga[0]
