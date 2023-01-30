@@ -3,42 +3,61 @@ from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
 from db_connections import getConexaoLocal
-from functions_list import Filter_Queue, Filter_Running, Filter_Failed, Filter_OverTryFailure
-from api_functions import ResendJobs
-from db_functions import Local_InsertJobsResend, Local_Find_PendingCharges, Local_Find_PendingJobsByCharge, BQ_Find_JobsByIds, Local_UpdateJobs, Local_UpdateCharge
-from db_query import Query_Local_SelectJobsFromIdCharge
+from functions_list import Filter_Queue, Filter_Running, Filter_Failed_Local, Filter_OverTryFailure, Filter_Failed_BQ
+from db_functions import Local_Select_PendingCharges, BQ_Find_JobsByIds, Local_Update_Charge, Local_Select_PendingJobs, BQ_Select_JobsChildrenByIdParent, Local_Select_PendingCharges
+from db_query import Query_Local_SelectJobsFromIdCharge, Query_Local_InsertChildrenJob, Query_Local_UpdateJob
+from airflow.providers.mysql.operators.mysql import MySqlOperator
 
 with DAG(
     dag_id="1_atualizar_base_local",
     start_date=datetime(2022, 1, 1),
     schedule_interval="@hourly",
-    max_active_runs=1
+    max_active_runs=1,
+    default_args={"mysql_conn_id": "local_mysql"},
 ) as dag:
 
-    @task.sensor(poke_interval=10, timeout=3600, mode="reschedule", soft_fail=True, task_id="PegarCargasPendentes")
-    def PegarCargasPendentes() -> PokeReturnValue:
-        idCharge = Local_Find_PendingCharges()
-        return PokeReturnValue(is_done=len(idCharge) > 0, xcom_value=idCharge)
+    @task.sensor(poke_interval=10, timeout=3600, mode="reschedule", soft_fail=True, task_id="CapturarJobsPendentes")
+    def CapturarJobsPendentes() -> PokeReturnValue:
+        pendingJobs = Local_Select_PendingJobs()
+        return PokeReturnValue(is_done=len(pendingJobs) > 0, xcom_value=pendingJobs)
 
-    @task(task_id="CapturarJobsPendentes")
-    def CapturarJobsPendentes_Local(ti=None):
-        idCharges = ti.xcom_pull(task_ids="PegarCargasPendentes")
-        return Local_Find_PendingJobsByCharge(idCharges)
+    @task(task_id="PegarJobsPendentesNaBigQuery")
+    def PegarJobsPendentesNaBigQuery(ti=None):
+        pendingJobs = ti.xcom_pull(task_ids="CapturarJobsPendentes")
+        return BQ_Find_JobsByIds(pendingJobs)
 
-    @task(task_id="VerificarJobsPendentesNoBancoExterno")
-    def VerificarJobsPendentesNoBancoExterno(ti=None):
-        jobsPendentes = ti.xcom_pull(task_ids="CapturarJobsPendentes")        
-        return BQ_Find_JobsByIds(jobsPendentes)
+    @task(task_id="PegarJobsFilhosNaBigQuery")
+    def PegarJobsFilhosNaBigQuery(ti=None):
+        pendingJobs = ti.xcom_pull(task_ids="PegarJobsPendentesNaBigQuery")
+        idFailedJobs = list(filter(Filter_Failed_BQ, pendingJobs))
+        return BQ_Select_JobsChildrenByIdParent(idFailedJobs)
 
     @task
-    def AtualizarBancoLocal(ti=None):  
-        jobsEmProducao = ti.xcom_pull(task_ids="VerificarJobsPendentesNoBancoExterno")
-        Local_UpdateJobs(jobsEmProducao)
+    def PrepararSQLs(ti=None):
+        jobsProd = ti.xcom_pull(task_ids="PegarJobsPendentesNaBigQuery")
+        childrenJobs = ti.xcom_pull(task_ids="PegarJobsFilhosNaBigQuery")
+        ti.xcom_push(key="SQL_INSERT_CHILDRENJOBS",
+                     value=Query_Local_InsertChildrenJob(childrenJobs))
+        ti.xcom_push(key="SQL_UPDATEJOBS",
+                     value=Query_Local_UpdateJob(jobsProd))
+
+    InserirJobsFilhos = MySqlOperator(
+        task_id="MYSQL_InserirJobsFilhos",
+        sql="{{ti.xcom_pull(key='SQL_INSERT_CHILDRENJOBS')}}",
+        dag=dag
+        )
+
+    AtualizarJobs = MySqlOperator(
+        task_id="MYSQL_AtualizarJobs",
+        sql="{{ti.xcom_pull(key='SQL_UPDATEJOBS')}}",
+        dag=dag
+        )
 
     @task
     def TratarCargas(ti=None):
-        cargas = ti.xcom_pull(task_ids="PegarCargasPendentes")
-        db = getConexaoLocal() # Se tentarmos usar a função de Local_Find_PendingChargesByCharge dá erro de excesso de conexão, sem sentido nenhum
+        cargas = Local_Select_PendingCharges()
+        # Se tentarmos usar a função de Local_Find_PendingChargesByCharge dá erro de excesso de conexão, sem sentido nenhum
+        db = getConexaoLocal()
         cursor = db.cursor()
         for carga in cargas:
             idCarga = carga[0]
@@ -46,14 +65,12 @@ with DAG(
             cursor.execute(query)
             jobs = cursor.fetchall()
             jobs_EmFila = list(filter(Filter_Queue, jobs))
-            jobs_Falhos = list(filter(Filter_Failed, jobs))
-            jobs_FalhosPorExcessoDeTentativa = list(filter(Filter_OverTryFailure, jobs))
+            jobs_Falhos = list(filter(Filter_Failed_Local, jobs))
+            jobs_FalhosPorExcessoDeTentativa = list(
+                filter(Filter_OverTryFailure, jobs))
             jobs_Rodando = list(filter(Filter_Running, jobs))
             jobs_pendentes = len(jobs_EmFila) > 0 or len(
                 jobs_Falhos) > 0 or len(jobs_Rodando) > 0
-            if (len(jobs_Falhos) > 0):
-                ReenviarJobs(idCarga)
-
             if (jobs_pendentes):
                 continue
 
@@ -62,15 +79,9 @@ with DAG(
                     jobs_FalhosPorExcessoDeTentativa) > 0)
         db.close()
 
-    def ReenviarJobs(idCharge):
-        jobs = ResendJobs(idCharge)
-        Local_InsertJobsResend(jobs)
-
     def AtualizarCargas(idCharge: str, parcialmenteCompleto: bool):
-        import requests
         state = 'Partially_Done' if parcialmenteCompleto else 'Done'
-        Local_UpdateCharge(idCharge, state)
-        requests.get(f"http://host.docker.internal:3005/updateStateOfCharge/?id_charge={idCharge}&state={state}")
+        Local_Update_Charge(idCharge, state)
 
-    PegarCargasPendentes() >> CapturarJobsPendentes_Local(
-    ) >> VerificarJobsPendentesNoBancoExterno() >> AtualizarBancoLocal() >> TratarCargas()
+    CapturarJobsPendentes() >> PegarJobsPendentesNaBigQuery(
+    ) >> PegarJobsFilhosNaBigQuery() >> PrepararSQLs() >> InserirJobsFilhos >> AtualizarJobs >> TratarCargas()
