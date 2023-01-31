@@ -3,7 +3,7 @@ from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
 from db_connections import getConnectionLocal
-from functions_list import Filter_Queue, Filter_Running, Filter_Failed_Local, Filter_OverTryFailure, Filter_Failed_BQ
+from utils_functions import Filter_Queue, Filter_Running, Filter_Failed_Local, Filter_OverTryFailure, Filter_Failed_BQ
 from db_functions import Local_Select_PendingCharges, Local2_Select_JobsByIds, Local_Update_Charge, Local_Select_PendingJobs, Local2_Select_JobsChildrenByIdParent, Local_Select_PendingCharges
 from db_query import Query_Local_SelectJobsFromIdCharge, Query_Local_InsertChildrenJob, Query_Local_UpdateJob
 from airflow.providers.mysql.operators.mysql import MySqlOperator

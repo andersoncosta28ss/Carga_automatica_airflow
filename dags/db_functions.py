@@ -1,7 +1,6 @@
 from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
 from db_query import Query_Local_SelectCrendetial
-from google.cloud import bigquery
-from functions_list import Map_IdJobs
+from utils_functions import Map_IdJobs
 
 # region Local
 
@@ -39,7 +38,7 @@ def Local_Select_PendingJobs():
     db = getConnectionLocal()
     cursor = db.cursor()
     cursor.execute(
-        f"SELECT id, status, was_sent, retry, id_parent FROM job WHERE was_sent = false AND status NOT IN('done', 'timeout')")
+        f"SELECT id, status, was_sent, retries, id_parent FROM job WHERE was_sent = false AND status NOT IN('done', 'timeout') AND isInvalidCredential = false")
     pendingJobs = cursor.fetchall()
     db.close()
     db.disconnect()
@@ -62,7 +61,7 @@ def Local2_Select_JobsByIds(jobs):
     cursor = db.cursor()
     idJobs = ','.join(map(Map_IdJobs, jobs))
     cursor.execute(
-        f"SELECT id, status, retry, id_parent FROM job WHERE id IN ({idJobs})")
+        f"SELECT id, status, retries, id_parent FROM job WHERE id IN ({idJobs})")
     resultJobs = cursor.fetchall()
     cursor = db.cursor()
     db.close()
@@ -76,7 +75,7 @@ def Local2_Select_JobsChildrenByIdParent(jobs):
     idfailedJobs = ','.join(map(Map_IdJobs, jobs))
     if (len(idfailedJobs) > 0):
         cursor.execute(
-            f"SELECT id, status, retry, id_parent FROM job WHERE id_parent IN ({idfailedJobs})")
+            f"SELECT id, status, retries, id_parent FROM job WHERE id_parent IN ({idfailedJobs})")
         jobsChildren = cursor.fetchall()
     db.close()
     return jobsChildren
@@ -108,15 +107,14 @@ def Prod_Select_Credentials(envs):
 
 
 def BQ_Select_JobsByIds(jobs, envs):
-    import json
     print("---- Começa -----")
     print(jobs)
-    print(json.loads(envs.get("BQ_JSON")))
     db = getConnectionBQ(envs)
     idJobs = ','.join(map(Map_IdJobs, jobs))
     query_job = db.query(
-        f"SELECT job_id, status, retries, parent_id FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})")
+        f"SELECT job_id, status, retries, parent_id, params, credential_id, errors FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})")
     result = [list(dict(row).values()) for row in query_job]
+    print(result)
     db.close()
     return result
 
@@ -127,7 +125,7 @@ def BQ_Select_JobsChildrenByIdParent(jobs, envs):
     idfailedJobs = ','.join(map(Map_IdJobs, jobs))
     if (len(idfailedJobs) > 0):
         query_job = db.query(
-            f"SELECT job_id, status, retries, parent_id FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE id_parent IN ({idfailedJobs})")
+            f"SELECT job_id, status, retries, parent_id, params, credential_id FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE id_parent IN ({idfailedJobs})")
         jobsChildren = [list(dict(row).values()) for row in query_job]
     db.close()
     return jobsChildren
