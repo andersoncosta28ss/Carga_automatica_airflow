@@ -9,14 +9,14 @@ def Local_SendToAPI(idCredentials):
     import requests
     from uuid import uuid4
     charges = []
-    for idCredencial in idCredentials:
+    for idCredential in idCredentials:
         url = url_base_base + "create_charge"
         payload = json.dumps({"pastDays": 365, "splitDayInterval": 30})
         headers = {'Content-Type': 'application/json'}
         response = requests.request("POST", url, headers=headers, data=payload)
         charge = response.json()
         charges.append(
-            {"idCarga": charge["uuid"], "idCredencial": idCredencial, "idJobs": charge["children"]})
+            {"idCharge": charge["uuid"], "idCredential": idCredential, "idJobs": charge["children"]})
     return charges
 
 
@@ -47,23 +47,23 @@ def Local_SplitJob(failedJobs):
 
 def Prod_SendToAPI(idCredentials, envs):
     charges = []
-    for idCredencial in idCredentials:
+    for idCredential in idCredentials:
         payload = json.dumps({
             "queue": "sbot-input",
             "action": "contract-fetch",
             "retries": 1,
-            "credentialId": idCredencial,
+            "credentialId": idCredential,
             "priority": "normal",
-            "procedure": [{"script": "{insurer}/contract-fetch", "params": {"pastDays":  5}}]
+            "procedure": [{"script": "{insurer}/contract-fetch", "params": {"pastDays":  60, "splitDayInterval": 20}}]
         })
         response = requests.request("POST", url=envs.get("API_URL"), headers={
             "Authorization": envs.get("API_AUTHORIZATION"),
             "Content-Type": "application/json"
         }, data=payload)
         charge = response.json()
-
-        charges.append(
-            {"idCharge": charge["uuid"], "idJobs": charge["children"]})
+        if(charge.__contains__("error")):
+            continue
+        charges.append({"idCharge": charge["uuid"], "idJobs": charge["children"], "idCredential": idCredential})
     return charges
 
 

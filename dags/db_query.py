@@ -22,9 +22,12 @@ def Query_Local_Insert_ChildrenJob(jobs):
 
 def Query_Local_Insert_Charge(charges):
     query = ""
+    if (len(charges) == 0):
+        return "SELECT 0"
+
     for charge in charges:
-        idCharge = charge['idCarga']
-        idCredential = charge['idCredencial']
+        idCharge = charge['idCharge']
+        idCredential = charge['idCredential']
         idJobs = charge['idJobs']
         query += f"INSERT INTO credential(id) VALUES({idCredential});"
         query += f"INSERT INTO charge (id, credential_id) values('{idCharge}', '{idCredential}');"
@@ -63,6 +66,8 @@ def Query_Local_Select_JobsFromIdCharge(idCharge):
 
 def Query_Local_Update_Job(jobs):
     query = ""
+    if (len(jobs) == 0):
+        return "SELECT 0"
     for job in jobs:
         isInvalidCredential = IsErrorInvalidCredential(job[6])
         params = json.dumps(job[4])
