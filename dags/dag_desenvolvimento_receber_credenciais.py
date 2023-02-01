@@ -5,7 +5,7 @@ from airflow.sensors.base import PokeReturnValue
 from db_functions import Local2_Select_Credentials, Local_Filter_Credentials
 from api_functions import Local_SendToAPI
 from airflow.providers.mysql.operators.mysql import MySqlOperator
-from db_query import Query_Local_InsertCharge
+from db_query import Query_Local_Insert_Charge
 
 
 with DAG(dag_id="2-desenvolvimento_receber_credenciais",
@@ -25,7 +25,7 @@ with DAG(dag_id="2-desenvolvimento_receber_credenciais",
     def Enviar_Para_RoberthAPI(ti=None):
         credenciais = ti.xcom_pull(task_ids="Sensor_VerificarSeExisteCredencialNova")
         result = Local_SendToAPI(credenciais)        
-        ti.xcom_push(key="SQL_INSERT_CHARGE", value=Query_Local_InsertCharge(result))
+        ti.xcom_push(key="SQL_INSERT_CHARGE", value=Query_Local_Insert_Charge(result))
         return result
 
     mysql_task = MySqlOperator(

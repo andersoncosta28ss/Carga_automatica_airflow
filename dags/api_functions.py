@@ -10,20 +10,39 @@ def Local_SendToAPI(idCredentials):
     from uuid import uuid4
     charges = []
     for idCredencial in idCredentials:
-        idCarga = str(uuid4())
-        response = requests.get(
-            f"http://host.docker.internal:3005/criar_carga2?id_charge={idCarga}&id_credential={idCredencial}")
-        jobsId = response.json()
+        url = url_base_base + "create_charge"
+        payload = json.dumps({"pastDays": 365, "splitDayInterval": 30})
+        headers = {'Content-Type': 'application/json'}
+        response = requests.request("POST", url, headers=headers, data=payload)
+        charge = response.json()
         charges.append(
-            {"idCarga": idCarga, "idCredencial": idCredencial, "idJobs": jobsId})
+            {"idCarga": charge["uuid"], "idCredencial": idCredencial, "idJobs": charge["children"]})
     return charges
 
 
-def Local_ResendJobs(idCharge):
-    response = requests.get(
-        url_base_base + "resend_jobs_failed/?" + "id_charge=" + idCharge)
-    result = response.json()
-    return result
+def Local_SplitJob(failedJobs):
+    jobs = []
+    for job in failedJobs:
+        id = job[0]
+        status = job[1]
+        retries = job[2]
+        parent_id = job[3]
+        params = job[4]
+        credential_id = job[5]
+        startDate = Get_StartDate(params)
+        endDate = Get_EndDate(params)
+        splitDayInterval = f'"splitDayInterval": {int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]) / 2)}' 
+        payload = str({startDate["str"], endDate["str"], splitDayInterval}).replace("'", '')
+        if (startDate["value"] == endDate["value"]):
+            continue
+
+        idCharge = Get_IdCharge(id)
+
+        response = requests.request("POST", url=url_base_base+"splitjob", headers={"Content-Type": "application/json"}, data=payload)
+        result = response.json()
+
+        jobs.append({"idCredential": credential_id, "idJobs": result["children"], "idCharge": idCharge, "parent_id": id})
+    return jobs
 
 
 def Prod_SendToAPI(idCredentials, envs):
@@ -44,7 +63,7 @@ def Prod_SendToAPI(idCredentials, envs):
         charge = response.json()
 
         charges.append(
-            {"idCarga": charge["uuid"], "idCredencial": idCredencial, "idJobs": charge["children"]})
+            {"idCharge": charge["uuid"], "idJobs": charge["children"]})
     return charges
 
 
@@ -59,24 +78,25 @@ def Prod_SplitJob(failedJobs, envs):
         credential_id = json[5]
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
-        splitDayInterval = f'"splitDayInterval": {GetNumberOfDaysBetweenTwoDates(startDate["src"], endDate["src"])}'
+        splitDayInterval = f'"splitDayInterval": {int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]) / 2)}'
         if (startDate["value"] == endDate["value"]):
             continue
-        
+
         idCharge = Get_IdCharge(id)
+        params =  str({startDate["str"], endDate["str"], splitDayInterval}).replace("'", '')
         payload = json.dumps({
             "queue": "sbot-input",
             "action": "contract-fetch",
             "retries": 1,
             "credentialId": credential_id,
             "priority": "normal",
-            "procedure": [{"script": "{insurer}/contract-fetch", "params": str({ startDate["str"], endDate["str"], splitDayInterval }).replace("'", '')}]
+            "procedure": [{"script": "{insurer}/contract-fetch", "params": params}]
         })
         response = requests.request("POST", url=envs.get("API_URL"), headers={
             "Authorization": envs.get("API_AUTHORIZATION"),
             "Content-Type": "application/json"
         }, data=payload)
-        jobs = response.json()
+        result = response.json()
 
-        jobs.append({"idCredencial": credential_id, "idJobs": jobs["children"], "idCharge": idCharge})
+        jobs.append({"idCredential": credential_id, "idJobs": result["children"], "idCharge": idCharge, "parent_id": id})
     return jobs

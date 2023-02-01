@@ -6,7 +6,7 @@ from db_functions import Prod_Select_Credentials, Local_Filter_Credentials
 from api_functions import Prod_SendToAPI
 from airflow.models import Variable
 from airflow.providers.mysql.operators.mysql import MySqlOperator
-from db_query import Query_Local_InsertCharge
+from db_query import Query_Local_Insert_Charge
 from utils_conts import _1hr, _24hrs, _10s
 
 
@@ -31,7 +31,7 @@ with DAG(
             task_ids="Sensor_VerificarSeExisteCredencialNova")
         result = Prod_SendToAPI(credenciais, Variable)
         ti.xcom_push(key="SQL_INSERT_CHARGE",
-                     value=Query_Local_InsertCharge(result))
+                     value=Query_Local_Insert_Charge(result))
         return result
 
     mysql_task = MySqlOperator(
