@@ -23,12 +23,15 @@ def Local_SendToAPI(idCredentials):
 def Local_SplitJob(failedJobs):
     jobs = []
     for job in failedJobs:
-        id = job[0]
-        status = job[1]
-        retries = job[2]
-        parent_id = job[3]
-        params = job[4]
-        credential_id = job[5]
+        id = job["job_id"]
+        status = job["status"]
+        retries = job["retries"]
+        parent_id = job["parent_id"]
+        params = job["params"]
+        credential_id = job["credential_id"]
+        print("IMPRIMINDO...")
+        print(type(params))
+        print(params)
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
         splitDayInterval = f'"splitDayInterval": {int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]) / 2)}' 
@@ -70,12 +73,12 @@ def Prod_SendToAPI(idCredentials, envs):
 def Prod_SplitJob(failedJobs, envs):
     jobs = []
     for job in failedJobs:
-        id = job[0]
-        status = job[1]
-        retries = job[2]
-        parent_id = job[3]
-        params = json.loads(job[4])
-        credential_id = json[5]
+        id = job["job_id"]
+        status = job["status"]
+        retries = job["retries"]
+        parent_id = job["parent_id"]
+        params = json.dumps(job["params"])
+        credential_id = job["credential_id"]
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
         splitDayInterval = f'"splitDayInterval": {int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]) / 2)}'

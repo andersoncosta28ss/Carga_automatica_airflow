@@ -1,4 +1,5 @@
 from utils_functions import Get_IdCharge, IsErrorInvalidCredential
+from utils_conts import SQL_JOB_DefaultExternalFields, SQL_JOB_DefaultInternalFields
 import json
 # region Local
 
@@ -7,14 +8,17 @@ def Query_Local_Insert_ChildrenJob(jobs):
     if (len(jobs) == 0):
         return "SELECT 0"
     for job in jobs:
-        id = job[0]
-        status = job[1]
-        retries = job[2]
-        parent_id = job[3]
-        params = json.dumps(job[4])
+        print("IMPRIMINDO -> " + str(job))
+        id = job["job_id"]
+        status = job["status"]
+        retries = job["retries"]
+        parent_id = job["parent_id"]
+        params = json.dumps(job["params"])
+        errors = job["errors"]
+        credential_id = job["credential_id"]
         id_charge = Get_IdCharge(parent_id)
         query += f"""
-                    INSERT INTO job(job_id, status, retries, parent_id, id_charge, params) VALUES('{id}','{status}', {retries}, '{parent_id}', '{id_charge}', {params});
+                    INSERT INTO job({SQL_JOB_DefaultExternalFields}, id_charge) VALUES('{id}','{status}', {retries}, '{id_charge}', {params}, '{errors}', '{credential_id}' ,'{parent_id}');
                     UPDATE job SET was_sent = true WHERE job_id = '{parent_id}';
         """
     return query
@@ -37,17 +41,15 @@ def Query_Local_Insert_Charge(charges):
     return query
 
 
-def Query_Local_Insert_Splited_Jobs(jobsWithCredential):
+def Query_Local_Insert_Splited_Jobs(jobs):
     query = ""
-    if(len(jobsWithCredential) == 0):
+    if(len(jobs) == 0):
         return "SELECT 0"
-    for jWc in jobsWithCredential:
-        idJobs = jWc["idJobs"]
-        idCharge = jWc["idCharge"]
-        parent_id = jWc["parent_id"]
-        idCredential = jWc["idCredential"]
-        print("A Credencial é None? -> " + str(idCredential is None))
-        params = '{}'
+    for job in jobs:        
+        idJobs = job["idJobs"]
+        idCharge = job["idCharge"]
+        parent_id = job["parent_id"]
+        params = {}
         query += f"UPDATE job SET was_sent = true WHERE job_id = '{parent_id}';"
 
         for idJob in idJobs:
@@ -61,7 +63,7 @@ def Query_Local_Select_Crendetial(idCredential):
 
 
 def Query_Local_Select_JobsFromIdCharge(idCharge):
-    return f"SELECT job_id, status, was_sent, retries, parent_id FROM job WHERE id_charge = '{idCharge}' AND status <> 'done'"
+    return f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE id_charge = '{idCharge}' AND status <> 'done'"
 
 
 def Query_Local_Update_Job(jobs):
@@ -69,9 +71,14 @@ def Query_Local_Update_Job(jobs):
     if (len(jobs) == 0):
         return "SELECT 0"
     for job in jobs:
-        isInvalidCredential = IsErrorInvalidCredential(job[6])
-        params = json.dumps(job[4])
-        query += f"UPDATE job SET status = '{job[1]}', retries = {job[2]}, parent_id = '{job[3]}', params = {params}, isInvalidCredential = {isInvalidCredential} WHERE job_id = '{job[0]}';"
+        id = job["job_id"]
+        status = job["status"]
+        retries = job["retries"]
+        parent_id = job["parent_id"]
+        params = json.dumps(job["params"])
+        errors = job["errors"]
+        isInvalidCredential = IsErrorInvalidCredential(errors)
+        query += f"UPDATE job SET status = '{status}', retries = {retries}, parent_id = '{parent_id}', params = {params}, errors = '{errors}', isInvalidCredential = {isInvalidCredential} WHERE job_id = '{id}';"
     return query
 
 # endregion

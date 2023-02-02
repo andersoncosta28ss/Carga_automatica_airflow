@@ -6,27 +6,54 @@ import re
 
 
 def Filter_Queue(job):
-    return job[1] == 'queue'
+    return job["status"] == 'queue'
 
 
 def Filter_Running(job):
-    return job[1] == 'running'
+    return job["status"] == 'running'
 
 
 def Filter_Failed(job):
-    return job[1] == 'failed' and job[2] > 0
+    return job["status"] == 'failed' and job["retries"] > 0
 
 
 def Filter_OverTryFailure(job):
-    return job[1] == 'failed' and job[2] <= 0
+    return job["status"] == 'failed' and job["retries"] <= 0
 
 
 def Filter_Failed_ToValidCharge(job):
-    return job[1] == 'failed' and job[2] > 0 and job[3] == False 
+    return job["status"] == 'failed' and job["retries"] > 0 and job["was_sent"] == False
 
 
 def Map_IdJobs(job):
-    return str(f"'{job[0]}'")
+    id = job["job_id"]
+    return str(f"'{id}'")
+
+
+def Map_ExternalJobs(job):
+    return {
+        "job_id": job[0],
+        "status": job[1],
+        "retries": job[2],
+        "parent_id": job[3],
+        "params": job[4],
+        "errors": job[5],
+        "credential_id": job[6]
+    }
+
+
+def Map_InternalJobs(job):
+    return {
+        "job_id": job[0],
+        "status": job[1],
+        "retries": job[2],
+        "parent_id": job[3],
+        "params": job[4],
+        "errors": job[5],
+        "was_sent": job[6],
+        "isInvalidcredential": job[7],
+        "credential_id": job[8]
+    }
 
 
 def Get_StartDate(_json: str) -> str:

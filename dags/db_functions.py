@@ -1,6 +1,7 @@
 from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
 from db_query import Query_Local_Select_Crendetial, Query_Local_Select_JobsFromIdCharge
-from utils_functions import Map_IdJobs, Filter_Failed_ToValidCharge, Filter_Queue, Filter_OverTryFailure, Filter_Running
+from utils_functions import Map_IdJobs, Filter_Failed_ToValidCharge, Filter_Queue, Filter_OverTryFailure, Filter_Running, Map_ExternalJobs, Map_InternalJobs
+from utils_conts import SQL_JOB_DefaultExternalFields, SQL_JOB_DefaultInternalFields
 
 # region Local
 
@@ -34,15 +35,15 @@ def Local_Select_PendingCharges():
 
 
 def Local_Select_PendingJobs():
-    pendingJobs = []
+    result = []
     db = getConnectionLocal()
     cursor = db.cursor()
     cursor.execute(
-        "SELECT job_id, status, was_sent, retries, parent_id FROM job WHERE was_sent = false AND status NOT IN('done', 'timeout') AND isInvalidCredential = false")
-    pendingJobs = cursor.fetchall()
+        f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done', 'timeout') AND isInvalidCredential = false")
+    result = cursor.fetchall()
     db.close()
     db.disconnect()
-    return pendingJobs
+    return list(map(Map_InternalJobs, result))
 
 
 def Local_Update_Charge(idCharge, state):
@@ -63,12 +64,13 @@ def Local_HandleCharge():
         idCharge = charge[0]
         query = (Query_Local_Select_JobsFromIdCharge(idCharge))
         cursor.execute(query)
-        jobs = cursor.fetchall()
-        jobs_EmFila = list(filter(Filter_Queue, jobs))
-        jobs_Falhos = list(filter(Filter_Failed_ToValidCharge, jobs))
+        result = cursor.fetchall()
+        result = list(map(Map_InternalJobs, result))
+        jobs_EmFila = list(filter(Filter_Queue, result))
+        jobs_Falhos = list(filter(Filter_Failed_ToValidCharge, result))
         jobs_FalhosPorExcessoDeTentativa = list(
-            filter(Filter_OverTryFailure, jobs))
-        jobs_Rodando = list(filter(Filter_Running, jobs))
+            filter(Filter_OverTryFailure, result))
+        jobs_Rodando = list(filter(Filter_Running, result))
         jobs_pendentes = len(jobs_EmFila) > 0 or len(
             jobs_Falhos) > 0 or len(jobs_Rodando) > 0
         if (jobs_pendentes):
@@ -79,6 +81,11 @@ def Local_HandleCharge():
                 jobs_FalhosPorExcessoDeTentativa) > 0 else 'Done'
             Local_Update_Charge(idCharge, state)
     db.close()
+
+
+# endregion
+
+
 # region somente para ambiente de desenvolvimento
 
 
@@ -87,24 +94,24 @@ def Local2_Select_JobsByIds(jobs):
     cursor = db.cursor()
     idJobs = ','.join(map(Map_IdJobs, jobs))
     cursor.execute(
-        f"SELECT job_id, status, retries, parent_id, params, credential_id, errors FROM job WHERE job_id IN ({idJobs})")
-    resultJobs = cursor.fetchall()
+        f"SELECT {SQL_JOB_DefaultExternalFields} FROM job WHERE job_id IN ({idJobs})")
+    result = cursor.fetchall()
     cursor = db.cursor()
     db.close()
-    return resultJobs
+    return list(map(Map_ExternalJobs, result))
 
 
 def Local2_Select_JobsChildrenByIdParent(jobs):
-    jobsChildren = []
+    result = []
     db = getConnectionLocal2()
     cursor = db.cursor()
-    idfailedJobs = ','.join(map(Map_IdJobs, jobs))
-    if (len(idfailedJobs) > 0):
+    idJobs = ','.join(map(Map_IdJobs, jobs))
+    if (len(idJobs) > 0):
         cursor.execute(
-            f"SELECT job_id, status, retries, parent_id, params, credential_id, errors FROM job WHERE parent_id IN ({idfailedJobs})")
-        jobsChildren = cursor.fetchall()
+            f"SELECT {SQL_JOB_DefaultExternalFields} FROM job WHERE parent_id IN ({idJobs})")
+        result = cursor.fetchall()
     db.close()
-    return jobsChildren
+    return list(map(Map_ExternalJobs, result))
 
 
 def Local2_Select_Credentials():
@@ -117,7 +124,6 @@ def Local2_Select_Credentials():
     return credentials
 # endregion
 
-# endregion
 
 # region Prod & BQ
 
@@ -135,21 +141,21 @@ def Prod_Select_Credentials(envs):
 def BQ_Select_JobsByIds(jobs, envs):
     db = getConnectionBQ(envs)
     idJobs = ','.join(map(Map_IdJobs, jobs))
-    query_job = db.query(
-        f"SELECT job_id, status, retries, parent_id, params, credential_id, errors FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})")
-    result = [list(dict(row).values()) for row in query_job]
+    query = f"SELECT {SQL_JOB_DefaultExternalFields} FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})"
+    query_job = db.query(query)
+    result = list(map(Map_ExternalJobs, query_job))
     db.close()
     return result
 
 
 def BQ_Select_JobsChildrenByIdParent(jobs, envs):
-    jobsChildren = []
+    result = []
     db = getConnectionBQ(envs)
-    idfailedJobs = ','.join(map(Map_IdJobs, jobs))
-    if (len(idfailedJobs) > 0):
-        query_job = db.query(
-            f"SELECT job_id, status, retries, parent_id, params, credential_id FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE parent_id IN ({idfailedJobs})")
-        jobsChildren = [list(dict(row).values()) for row in query_job]
+    idJobs = ','.join(map(Map_IdJobs, jobs))
+    if (len(idJobs) > 0):
+        query = f"SELECT {SQL_JOB_DefaultExternalFields} FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE parent_id IN ({idJobs})"
+        query_job = db.query(query)
+        result = list(map(Map_ExternalJobs, query_job))
     db.close()
-    return jobsChildren
+    return result
 # endregion
