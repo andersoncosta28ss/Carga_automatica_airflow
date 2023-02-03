@@ -7,7 +7,7 @@ from api_functions import Prod_SendToAPI
 from airflow.models import Variable
 from airflow.providers.mysql.operators.mysql import MySqlOperator
 from db_query import Query_Local_Insert_Charge
-from utils_conts import _1hr, _24hrs, _10s
+from utils_conts import _1hr, _24hrs, _10s, _1min
 
 
 with DAG(
@@ -19,7 +19,7 @@ with DAG(
     render_template_as_native_obj=True
 ) as dag:
 
-    @task.sensor(poke_interval=_10s, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_VerificarSeExisteCredencialNova")
+    @task.sensor(poke_interval=_1min * 5, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_VerificarSeExisteCredencialNova")
     def Sensor_VerificarSeExisteCredencialNova() -> PokeReturnValue:
         credenciais = Prod_Select_Credentials(Variable)
         credenciais = Local_Filter_Credentials(credenciais)

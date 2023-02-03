@@ -104,7 +104,7 @@ def Prod_Select_Credentials(envs):
     db = getConnectionProd(envs)
     cursor = db.cursor()
     cursor.execute(
-        "SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), interval 30 SECOND) AND loginvalido = true")
+        "SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), INTERVAL 10 MINUTE) AND loginvalido = true")
     credentials = cursor.fetchall()
     db.close()
     return credentials

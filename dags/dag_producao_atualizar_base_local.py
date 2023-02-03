@@ -20,7 +20,7 @@ with DAG(
     render_template_as_native_obj=True
 ) as dag:
 
-    @task.sensor(poke_interval=_1min, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarJobsPendentes")
+    @task.sensor(poke_interval=_1min * 5, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarJobsPendentes")
     def CapturarJobsPendentes() -> PokeReturnValue:
         pendingJobs = Local_Select_PendingJobs()
         return PokeReturnValue(is_done=len(pendingJobs) > 0, xcom_value=pendingJobs)

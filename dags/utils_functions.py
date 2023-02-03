@@ -89,7 +89,7 @@ def Get_IdCharge(idJob: str):
     db = getConnectionLocal()
     cursor = db.cursor()
     cursor.execute(
-        f"SELECT id_charge FROM job WHERE job_id = '{idJob}'")
+        f"SELECT charge_id FROM job WHERE job_id = '{idJob}'")
     result = cursor.fetchone()
     db.close()
     return result[0]

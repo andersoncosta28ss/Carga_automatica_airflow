@@ -18,7 +18,7 @@ with DAG(
     default_args={"mysql_conn_id": "local_mysql"},
     render_template_as_native_obj=True
 ) as dag:
-    @task.sensor(poke_interval=_1min, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarCargasPendentes")
+    @task.sensor(poke_interval=_1min * 10, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarCargasPendentes")
     def Sensor_CapturarCargasPendentes() -> PokeReturnValue:
         pendingCharges = Local_Select_PendingCharges()
         return PokeReturnValue(is_done=len(pendingCharges) > 0, xcom_value=pendingCharges)
