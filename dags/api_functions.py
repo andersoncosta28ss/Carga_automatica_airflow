@@ -1,4 +1,3 @@
-
 import requests
 import json
 from utils_functions import Get_EndDate, Get_StartDate, Get_IdCharge, GetNumberOfDaysBetweenTwoDates
@@ -29,22 +28,22 @@ def Local_SplitJob(failedJobs):
         parent_id = job["parent_id"]
         params = job["params"]
         credential_id = job["credential_id"]
-        print("IMPRIMINDO...")
-        print(type(params))
-        print(params)
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
-        splitDayInterval = f'"splitDayInterval": {int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]) / 2)}' 
-        payload = str({startDate["str"], endDate["str"], splitDayInterval}).replace("'", '')
+        splitDayInterval = f'"splitDayInterval": {int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]) / 2)}'
+        payload = str({startDate["str"], endDate["str"],
+                      splitDayInterval}).replace("'", '')
         if (startDate["value"] == endDate["value"]):
             continue
 
         idCharge = Get_IdCharge(id)
 
-        response = requests.request("POST", url=url_base_base+"splitjob", headers={"Content-Type": "application/json"}, data=payload)
+        response = requests.request("POST", url=url_base_base+"splitjob", headers={
+                                    "Content-Type": "application/json"}, data=payload)
         result = response.json()
 
-        jobs.append({"idCredential": credential_id, "idJobs": result["children"], "idCharge": idCharge, "parent_id": id})
+        jobs.append({"idCredential": credential_id,
+                    "idJobs": result["children"], "idCharge": idCharge, "parent_id": id})
     return jobs
 
 
@@ -57,16 +56,17 @@ def Prod_SendToAPI(idCredentials, envs):
             "retries": 1,
             "credentialId": idCredential,
             "priority": "normal",
-            "procedure": [{"script": "{insurer}/contract-fetch", "params": {"pastDays":  60, "splitDayInterval": 20}}]
+            "procedure": [{"script": "{insurer}/contract-fetch", "params": {"pastDays":  365, "splitDayInterval": 30}}]
         })
         response = requests.request("POST", url=envs.get("API_URL"), headers={
             "Authorization": envs.get("API_AUTHORIZATION"),
             "Content-Type": "application/json"
         }, data=payload)
         charge = response.json()
-        if(charge.__contains__("error")):
+        if (charge.__contains__("error")):
             continue
-        charges.append({"idCharge": charge["uuid"], "idJobs": charge["children"], "idCredential": idCredential})
+        charges.append(
+            {"idCharge": charge["uuid"], "idJobs": charge["children"], "idCredential": idCredential})
     return charges
 
 
@@ -77,21 +77,23 @@ def Prod_SplitJob(failedJobs, envs):
         status = job["status"]
         retries = job["retries"]
         parent_id = job["parent_id"]
-        params = json.dumps(job["params"])
-        credential_id = job["credential_id"]
+        params = job["params"]
+        credential_id = int(job["credential_id"])
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
-        splitDayInterval = f'"splitDayInterval": {int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]) / 2)}'
+        splitDayInterval = int(GetNumberOfDaysBetweenTwoDates(
+            startDate["value"], endDate["value"]) / 2)
         if (startDate["value"] == endDate["value"]):
             continue
 
         idCharge = Get_IdCharge(id)
-        params =  str({startDate["str"], endDate["str"], splitDayInterval}).replace("'", '')
+        params = {"startDate": startDate["value"],
+                  "endDate": endDate["value"], "splitDayInterval": splitDayInterval}
         payload = json.dumps({
             "queue": "sbot-input",
             "action": "contract-fetch",
             "retries": 1,
-            "credentialId": credential_id,
+            "credential_id": credential_id,
             "priority": "normal",
             "procedure": [{"script": "{insurer}/contract-fetch", "params": params}]
         })
@@ -99,7 +101,10 @@ def Prod_SplitJob(failedJobs, envs):
             "Authorization": envs.get("API_AUTHORIZATION"),
             "Content-Type": "application/json"
         }, data=payload)
+        print(payload)
         result = response.json()
+        print(result)
 
-        jobs.append({"idCredential": credential_id, "idJobs": result["children"], "idCharge": idCharge, "parent_id": id})
+        jobs.append({"idCredential": credential_id,
+                    "idJobs": result["children"], "idCharge": idCharge, "parent_id": id})
     return jobs

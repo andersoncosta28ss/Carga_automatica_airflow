@@ -5,8 +5,8 @@ from datetime import date
 import re
 
 
-def Filter_Queue(job):
-    return job["status"] == 'queue'
+def Filter_Queued(job):
+    return job["status"] == 'queued'
 
 
 def Filter_Running(job):
@@ -57,7 +57,8 @@ def Map_InternalJobs(job):
 
 
 def Get_StartDate(_json: str) -> str:
-    _dict = json.loads(_json)
+    _dict: dict = json.loads(_json)
+    print(_dict)
     key = "startDate"
     value = ""
     if (_dict.__contains__("startDate")):

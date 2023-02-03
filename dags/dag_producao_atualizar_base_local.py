@@ -3,12 +3,12 @@ from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
 from utils_functions import Filter_Failed, Filter_OverTryFailure
-from db_functions import BQ_Select_JobsByIds, Local_Select_PendingJobs, BQ_Select_JobsChildrenByIdParent, Local_HandleCharge
+from db_functions import BQ_Select_JobsByIds, Local_Select_PendingJobs, BQ_Select_JobsChildrenByIdParent
 from db_query import Query_Local_Insert_ChildrenJob, Query_Local_Update_Job, Query_Local_Insert_Splited_Jobs
 from api_functions import Prod_SplitJob
 from airflow.providers.mysql.operators.mysql import MySqlOperator
 from airflow.models import Variable
-from utils_conts import _1hr, _24hrs, _10s
+from utils_conts import _1hr, _24hrs, _10s, _1min
 
 
 with DAG(
@@ -20,7 +20,7 @@ with DAG(
     render_template_as_native_obj=True
 ) as dag:
 
-    @task.sensor(poke_interval=_10s, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarJobsPendentes")
+    @task.sensor(poke_interval=_1min, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarJobsPendentes")
     def CapturarJobsPendentes() -> PokeReturnValue:
         pendingJobs = Local_Select_PendingJobs()
         return PokeReturnValue(is_done=len(pendingJobs) > 0, xcom_value=pendingJobs)
@@ -77,9 +77,5 @@ with DAG(
         dag=dag
     )
 
-    @task
-    def TratarCargas(ti=None):
-        Local_HandleCharge()
-
     CapturarJobsPendentes() >> PegarJobsPendentesNaBigQuery(
-    ) >> PegarJobsFilhosNaBigQuery() >> QuebrarOsPeriodosDosJobsQueFalharam() >> PrepararSQLs() >> InserirJobsFilhos >> AtualizarJobs >> InserirJobsComPeriodosQuebrados >> TratarCargas()
+    ) >> PegarJobsFilhosNaBigQuery() >> QuebrarOsPeriodosDosJobsQueFalharam() >> PrepararSQLs() >> InserirJobsFilhos >> AtualizarJobs >> InserirJobsComPeriodosQuebrados

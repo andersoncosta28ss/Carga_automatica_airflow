@@ -3,7 +3,7 @@ from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
 from utils_functions import Filter_Failed, Filter_OverTryFailure
-from db_functions import Local2_Select_JobsByIds, Local_Select_PendingJobs, Local2_Select_JobsChildrenByIdParent, Local_HandleCharge
+from db_functions import Local2_Select_JobsByIds, Local_Select_PendingJobs, Local2_Select_JobsChildrenByIdParent
 from db_query import Query_Local_Insert_ChildrenJob, Query_Local_Update_Job, Query_Local_Insert_Splited_Jobs
 from airflow.providers.mysql.operators.mysql import MySqlOperator
 from api_functions import Local_SplitJob
@@ -73,9 +73,7 @@ with DAG(
         dag=dag
     )
 
-    @task
-    def TratarCargas(ti=None):
-        Local_HandleCharge()
+
 
     CapturarJobsPendentes() >> PegarJobsPendentesNaBigQuery(
-    ) >> PegarJobsFilhosNaBigQuery() >> QuebrarOsPeriodosDosJobsQueFalharam() >> PrepararSQLs() >> InserirJobsFilhos >> AtualizarJobs >> InserirJobsComPeriodosQuebrados >> TratarCargas()
+    ) >> PegarJobsFilhosNaBigQuery() >> QuebrarOsPeriodosDosJobsQueFalharam() >> PrepararSQLs() >> InserirJobsFilhos >> AtualizarJobs >> InserirJobsComPeriodosQuebrados

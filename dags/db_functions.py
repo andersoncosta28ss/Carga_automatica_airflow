@@ -1,6 +1,6 @@
 from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
-from db_query import Query_Local_Select_Crendetial, Query_Local_Select_JobsFromIdCharge
-from utils_functions import Map_IdJobs, Filter_Failed_ToValidCharge, Filter_Queue, Filter_OverTryFailure, Filter_Running, Map_ExternalJobs, Map_InternalJobs
+from db_query import Query_Local_Select_Crendetial
+from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs
 from utils_conts import SQL_JOB_DefaultExternalFields, SQL_JOB_DefaultInternalFields
 
 # region Local
@@ -52,34 +52,6 @@ def Local_Update_Charge(idCharge, state):
     cursor.execute(
         f"UPDATE charge SET status = '{state}' WHERE id = '{idCharge}'")
     db.commit()
-    db.close()
-
-
-def Local_HandleCharge():
-    charges = Local_Select_PendingCharges()
-    # Se tentarmos usar a função de Local_Find_PendingChargesByCharge dá erro de excesso de conexão, sem sentido nenhum
-    db = getConnectionLocal()
-    cursor = db.cursor()
-    for charge in charges:
-        idCharge = charge[0]
-        query = (Query_Local_Select_JobsFromIdCharge(idCharge))
-        cursor.execute(query)
-        result = cursor.fetchall()
-        result = list(map(Map_InternalJobs, result))
-        jobs_EmFila = list(filter(Filter_Queue, result))
-        jobs_Falhos = list(filter(Filter_Failed_ToValidCharge, result))
-        jobs_FalhosPorExcessoDeTentativa = list(
-            filter(Filter_OverTryFailure, result))
-        jobs_Rodando = list(filter(Filter_Running, result))
-        jobs_pendentes = len(jobs_EmFila) > 0 or len(
-            jobs_Falhos) > 0 or len(jobs_Rodando) > 0
-        if (jobs_pendentes):
-            continue
-
-        else:
-            state = 'Partially_Done' if len(
-                jobs_FalhosPorExcessoDeTentativa) > 0 else 'Done'
-            Local_Update_Charge(idCharge, state)
     db.close()
 
 
