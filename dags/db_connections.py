@@ -7,7 +7,7 @@ def getConnectionLocal():
         host="host.docker.internal",
         user="root",
         password="1234",
-        database="local"
+        database="LOCAL2"
     )
 
 

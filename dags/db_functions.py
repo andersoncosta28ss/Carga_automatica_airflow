@@ -39,7 +39,7 @@ def Local_Select_PendingJobs():
     db = getConnectionLocal()
     cursor = db.cursor()
     cursor.execute(
-        f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done', 'timeout') AND isInvalidCredential = false")
+        f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done') AND isInvalidCredential = false")
     result = cursor.fetchall()
     db.close()
     db.disconnect()

@@ -86,7 +86,7 @@ def Query_Local_Insert_Charge(charges):
         query += f"INSERT INTO charge (id, credential_id) values('{idCharge}', '{idCredential}');"
         paramsDefault = {}
         for idJob in idJobs:
-            query += f"INSERT INTO job (job_id, charge_id, params) values('{idJob}', '{idCharge}', '{paramsDefault}');"
+            query += f"INSERT INTO job (job_id, charge_id, params, credential_id) values('{idJob}', '{idCharge}', '{paramsDefault}', {idCredential});"
     return query
 
 

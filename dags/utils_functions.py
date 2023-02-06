@@ -14,15 +14,15 @@ def Filter_Running(job):
 
 
 def Filter_Failed(job):
-    return job["status"] == 'failed' and job["retries"] > 0
+    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] > 0
 
 
 def Filter_OverTryFailure(job):
-    return job["status"] == 'failed' and job["retries"] <= 0
+    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] <= 0
 
 
 def Filter_Failed_ToValidCharge(job):
-    return job["status"] == 'failed' and job["retries"] > 0 and job["was_sent"] == False
+    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] > 0 and job["was_sent"] == False
 
 
 def Map_IdJobs(job):
