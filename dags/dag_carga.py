@@ -1,14 +1,12 @@
 from datetime import datetime
 from airflow import DAG
 from airflow.decorators import task
-from airflow.sensors.base import PokeReturnValue
-from airflow.models import Variable
-from airflow.providers.mysql.operators.mysql import MySqlOperator
-from utils_conts import _1hr, _24hrs, _10s, _1min
+from utils_conts import SQL_JOB_DefaultInternalFields
 from db_functions import Local_Select_PendingCharges, Local_Update_Charge
 from db_connections import getConnectionLocal
 from utils_functions import Filter_Failed_ToValidCharge, Filter_Queued, Filter_OverTryFailure, Filter_Running, Map_InternalJobs
-from db_query import Query_Local_Select_JobsFromIdCharge
+from airflow.exceptions import AirflowSkipException
+
 
 with DAG(
     dag_id="3-carga",
@@ -16,21 +14,28 @@ with DAG(
     schedule_interval="@hourly",
     max_active_runs=1,
     default_args={"mysql_conn_id": "local_mysql"},
-    render_template_as_native_obj=True
+    render_template_as_native_obj=True,
+    catchup=False
 ) as dag:
-    @task.sensor(poke_interval=_1min * 10, timeout=_24hrs, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarCargasPendentes")
-    def Sensor_CapturarCargasPendentes() -> PokeReturnValue:
+    # @task.sensor(poke_interval=_1min, timeout=_1min * 5, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarCargasPendentes")
+    # def Sensor_CapturarCargasPendentes() -> PokeReturnValue:
+        # return PokeReturnValue(is_done=len(pendingCharges) > 0, xcom_value=pendingCharges)
+    @task(task_id="CapturarCargasPendentes")
+    def CapturarCargasPendentes():
         pendingCharges = Local_Select_PendingCharges()
-        return PokeReturnValue(is_done=len(pendingCharges) > 0, xcom_value=pendingCharges)
+        print("Quantidade de items capturados -> " + str(len(pendingCharges)))
+        if(len(pendingCharges) == 0):
+            raise AirflowSkipException
+        return pendingCharges
 
     @task
     def AtualizarACarga(ti=None):
-        charges = ti.xcom_pull(task_ids= "Sensor_CapturarCargasPendentes")
+        charges = ti.xcom_pull(task_ids= "CapturarCargasPendentes")
         db = getConnectionLocal()
         cursor = db.cursor()
         for charge in charges:
             idCharge = charge[0]
-            query = (Query_Local_Select_JobsFromIdCharge(idCharge))
+            query = f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE charge_id = '{idCharge}' AND status <> 'done'"
             cursor.execute(query)
             result = cursor.fetchall()
             result = list(map(Map_InternalJobs, result))
@@ -55,6 +60,6 @@ with DAG(
         db.close()
 
 
-    Sensor_CapturarCargasPendentes() >> AtualizarACarga()
+    CapturarCargasPendentes() >> AtualizarACarga()
 
     

@@ -1,5 +1,4 @@
 from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
-from db_query import Query_Local_Select_Crendetial
 from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs
 from utils_conts import SQL_JOB_DefaultExternalFields, SQL_JOB_DefaultInternalFields
 
@@ -13,7 +12,7 @@ def Local_Filter_Credentials(credentials):
     for credential in credentials:
         idCredential = credential[0]
 
-        query = Query_Local_Select_Crendetial(idCredential)
+        query = f"SELECT * FROM charge WHERE credential_id = {idCredential}"
         cursor.execute(query)
         consultaInterna = cursor.fetchall()
         if (len(consultaInterna) > 0):

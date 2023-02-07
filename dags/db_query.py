@@ -11,7 +11,6 @@ def Query_Local_Insert_ChildrenJob(jobs):
     if (len(jobs) == 0):
         return "SELECT 0"
     for job in jobs:
-        print("IMPRIMINDO -> " + str(job))
         id = job["job_id"]
         status = job["status"]
         retries = job["retries"]
@@ -63,14 +62,6 @@ def Query_Local_Insert_Splited_Jobs(jobs):
             query += f"INSERT INTO job (job_id, charge_id, params, jobFromSplited) values('{idJob}', '{idCharge}', '{params}', '{jobFromSplited}');"
 
     return query
-
-
-def Query_Local_Select_Crendetial(idCredential):
-    return f"SELECT * FROM charge WHERE credential_id = {idCredential}"
-
-
-def Query_Local_Select_JobsFromIdCharge(idCharge):
-    return f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE charge_id = '{idCharge}' AND status <> 'done'"
 
 
 def Query_Local_Insert_Charge(charges):
