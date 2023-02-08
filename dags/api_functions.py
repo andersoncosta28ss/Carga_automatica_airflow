@@ -35,11 +35,10 @@ def Local_SplitJob(failedJobs):
         credentialId = f'"credentialId": {int(credential_id)}'
         chargeId = f'"chargeId: {int(idCharge)}"'
 
-        payload = str({startDate["str"], endDate["str"], splitDayInterval, credentialId, chargeId}).replace("'", '')
+        payload = str({startDate["str"], endDate["str"],
+                      splitDayInterval, credentialId, chargeId}).replace("'", '')
         if (startDate["value"] == endDate["value"]):
             continue
-
-        
 
         response = requests.request("POST", url=url_base_base+"splitjob", headers={
                                     "Content-Type": "application/json"}, data=payload)
@@ -84,27 +83,44 @@ def Prod_SplitJob(failedJobs, envs):
         credential_id = int(job["credential_id"])
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
-        splitDayInterval = int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]) / 2)
+        splitDayInterval = int(GetNumberOfDaysBetweenTwoDates(
+            startDate["value"], endDate["value"]) / 2)
         if (startDate["value"] == endDate["value"]):
             continue
 
         idCharge = Get_IdCharge(id)
         params = {"startDate": startDate["value"],
-                  "endDate": endDate["value"], "splitDayInterval": splitDayInterval}
+                  "endDate": endDate["value"], "splitDayInterval": splitDayInterval
+                  }
         payload = json.dumps({
             "queue": "sbot-input",
             "action": "contract-fetch",
             "retries": 1,
             "credentialId": credential_id,
             "priority": "normal",
-            "procedure": [{"script": "{insurer}/contract-fetch", "params": params}]
+            "parentId": id,
+            "procedure": [
+                {
+                    "script": "{insurer}/contract-fetch",
+                    "params": params
+                }
+            ]
         })
-        response = requests.request("POST", url=envs.get("API_URL"), headers={
-            "Authorization": envs.get("API_AUTHORIZATION"),
-            "Content-Type": "application/json"
-        }, data=payload)
+        response = requests.request(
+            "POST",
+            url=envs.get("API_URL"),
+            headers={
+                "Authorization": envs.get("API_AUTHORIZATION"),
+                "Content-Type": "application/json"
+            },
+            data=payload
+        )
         result = response.json()
 
-        jobs.append({"idCredential": credential_id,
-                    "idJobs": result["children"], "idCharge": idCharge, "parent_id": id})
+        jobs.append({
+            "idCredential": credential_id,
+            "idJobs": result["children"],
+            "idCharge": idCharge,
+            "parent_id": id
+        })
     return jobs

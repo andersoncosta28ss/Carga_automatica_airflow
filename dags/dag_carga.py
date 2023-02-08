@@ -4,7 +4,7 @@ from airflow.decorators import task
 from utils_conts import SQL_JOB_DefaultInternalFields
 from db_functions import Local_Select_PendingCharges, Local_Update_Charge
 from db_connections import getConnectionLocal
-from utils_functions import Filter_Failed_ToValidCharge, Filter_Queued, Filter_OverTryFailure, Filter_Running, Map_InternalJobs
+from utils_functions import Local_Filter_Failed, Filter_Queued, Local_Filter_OverTryFailure, Filter_Running, Map_InternalJobs
 from airflow.exceptions import AirflowSkipException
 
 
@@ -40,9 +40,8 @@ with DAG(
             result = cursor.fetchall()
             result = list(map(Map_InternalJobs, result))
             jobs_EmFila = list(filter(Filter_Queued, result))
-            jobs_Falhos = list(filter(Filter_Failed_ToValidCharge, result))
-            jobs_FalhosPorExcessoDeTentativa = list(
-                filter(Filter_OverTryFailure, result))
+            jobs_Falhos = list(filter(Local_Filter_Failed, result))
+            jobs_FalhosPorExcessoDeTentativa = list(filter(Local_Filter_OverTryFailure, result))
             jobs_Rodando = list(filter(Filter_Running, result))
             jobs_pendentes = len(jobs_EmFila) > 0 or len(jobs_Falhos) > 0 or len(jobs_Rodando) > 0
             print("id carga -> " + str(idCharge))

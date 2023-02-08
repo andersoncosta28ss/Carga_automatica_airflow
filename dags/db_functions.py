@@ -1,5 +1,5 @@
 from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
-from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs
+from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs, GetNumberOfDaysBetweenTwoDates, Get_StartDate, Get_EndDate
 from utils_conts import SQL_JOB_DefaultExternalFields, SQL_JOB_DefaultInternalFields
 
 # region Local
@@ -130,3 +130,4 @@ def BQ_Select_JobsChildrenByIdParent(jobs, envs):
     db.close()
     return result
 # endregion
+

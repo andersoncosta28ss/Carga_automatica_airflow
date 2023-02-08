@@ -1,5 +1,5 @@
 from utils_functions import Get_IdCharge, IsErrorInvalidCredential
-from utils_conts import SQL_JOB_DefaultExternalFields, SQL_JOB_DefaultInternalFields
+from utils_conts import SQL_JOB_DefaultExternalFields
 import json
 from utils_functions import Get_EndDate, Get_StartDate, Get_IdCharge, GetNumberOfDaysBetweenTwoDates
 
@@ -54,12 +54,12 @@ def Query_Local_Insert_Splited_Jobs(jobs):
         idJobs = job["idJobs"]
         idCharge = job["idCharge"]
         parent_id = "" if job["parent_id"] is None else job["parent_id"]
-        jobFromSplited = parent_id
+        
         params = {}
         query += f"UPDATE job SET was_sent = true WHERE job_id = '{parent_id}';"
 
         for idJob in idJobs:
-            query += f"INSERT INTO job (job_id, charge_id, params, jobFromSplited) values('{idJob}', '{idCharge}', '{params}', '{jobFromSplited}');"
+            query += f"INSERT INTO job (job_id, charge_id, params, parent_id) values('{idJob}', '{idCharge}', '{params}', '{parent_id}');"
 
     return query
 

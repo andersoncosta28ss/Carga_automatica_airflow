@@ -13,6 +13,7 @@ with DAG(
     max_active_runs=1,
     catchup=False
 ) as dag:
+
     @task.sensor(poke_interval=_1min, mode="reschedule", timeout=_1min * 60, soft_fail=True, task_id="SENSOR", max_wait=_1min * 2)
     def GenerateRandomNumber() -> PokeReturnValue:
         from random import randint

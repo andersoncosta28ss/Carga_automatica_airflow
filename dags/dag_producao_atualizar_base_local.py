@@ -1,7 +1,7 @@
 from datetime import datetime
 from airflow import DAG
 from airflow.decorators import task
-from utils_functions import Filter_Failed, Filter_OverTryFailure
+from utils_functions import BQ_Filter_Failed, BQ_Filter_OverTryFailure
 from db_functions import BQ_Select_JobsByIds, Local_Select_PendingJobs, BQ_Select_JobsChildrenByIdParent
 from db_query import Query_Local_Insert_ChildrenJob, Query_Local_Update_Job, Query_Local_Insert_Splited_Jobs
 from api_functions import Prod_SplitJob
@@ -36,8 +36,8 @@ with DAG(
     def PegarJobsPendentesNaBigQuery(ti=None):
         pendingJobs = ti.xcom_pull(task_ids="CapturarJobsPendentes")
         _pendingJobs = BQ_Select_JobsByIds(pendingJobs, Variable)
-        failedJobs = list(filter(Filter_Failed, _pendingJobs))
-        jobsOverTryFailure = list(filter(Filter_OverTryFailure, _pendingJobs))
+        failedJobs = list(filter(BQ_Filter_Failed, _pendingJobs))
+        jobsOverTryFailure = list(filter(BQ_Filter_OverTryFailure, _pendingJobs))
         ti.xcom_push(key="FailedJobs", value=failedJobs)
         ti.xcom_push(key="JobsOverTryFailure", value=jobsOverTryFailure)
         return _pendingJobs

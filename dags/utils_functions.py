@@ -13,16 +13,20 @@ def Filter_Running(job):
     return job["status"] == 'running'
 
 
-def Filter_Failed(job):
+def BQ_Filter_Failed(job):
     return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] > 0
 
 
-def Filter_OverTryFailure(job):
-    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] <= 0
+def BQ_Filter_OverTryFailure(job):
+    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] == 0
 
 
-def Filter_Failed_ToValidCharge(job):
-    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] > 0 and job["was_sent"] == False
+def Local_Filter_Failed(job):
+    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] > 0 and job["was_sent"] == False and job["numberOfDay"] > 1
+
+
+def Local_Filter_OverTryFailure(job):
+    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] == 0 and job["numberOfDays"] == 1
 
 
 def Map_IdJobs(job):
@@ -52,15 +56,16 @@ def Map_InternalJobs(job):
         "errors": job[5],
         "was_sent": job[6],
         "isInvalidcredential": job[7],
-        "credential_id": job[8]
+        "credential_id": job[8],
+        "numberOfDays": job[9]
     }
 
 
 def Get_StartDate(_json: str) -> str:
     _dict: dict = json.loads(_json)
-    print(_dict)
     key = "startDate"
     value = ""
+    
     if (_dict.__contains__("startDate")):
         value = _dict[key]
 
