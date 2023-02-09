@@ -6,7 +6,6 @@ url_base_base = "http://host.docker.internal:3005/"
 
 def Local_SendToAPI(idCredentials):
     import requests
-    from uuid import uuid4
     charges = []
     for idCredential in idCredentials:
         url = url_base_base + "create_charge"
@@ -92,6 +91,58 @@ def Prod_SplitJob(failedJobs, envs):
         params = {"startDate": startDate["value"],
                   "endDate": endDate["value"], "splitDayInterval": splitDayInterval
                   }
+        payload = json.dumps({
+            "queue": "sbot-input",
+            "action": "contract-fetch",
+            "retries": 1,
+            "credentialId": credential_id,
+            "priority": "normal",
+            "parentId": id,
+            "procedure": [
+                {
+                    "script": "{insurer}/contract-fetch",
+                    "params": params
+                }
+            ]
+        })
+        response = requests.request(
+            "POST",
+            url=envs.get("API_URL"),
+            headers={
+                "Authorization": envs.get("API_AUTHORIZATION"),
+                "Content-Type": "application/json"
+            },
+            data=payload
+        )
+        result = response.json()
+
+        jobs.append({
+            "idCredential": credential_id,
+            "idJobs": result["children"],
+            "idCharge": idCharge,
+            "parent_id": id
+        })
+    return jobs
+
+
+def Prod_SendStaleJob(staleJobs, envs):
+    jobs = []
+    for job in staleJobs:
+        id = job["job_id"]
+        status = job["status"]
+        retries = job["retries"]
+        parent_id = job["parent_id"]
+        params = job["params"]
+        credential_id = int(job["credential_id"])
+        startDate = Get_StartDate(params)
+        endDate = Get_EndDate(params)
+
+        idCharge = Get_IdCharge(id)
+        params = {
+            "startDate": startDate["value"],
+            "endDate": endDate["value"]
+        }
+
         payload = json.dumps({
             "queue": "sbot-input",
             "action": "contract-fetch",

@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 from airflow import DAG
 from airflow.decorators import task
 from db_functions import Prod_Select_Credentials, Local_Filter_Credentials
@@ -11,7 +11,7 @@ from airflow.exceptions import AirflowSkipException
 
 with DAG(
     dag_id="2-producao_receber_credenciais",
-    start_date=datetime(2022, 1, 1),
+    start_date=datetime.datetime(2022, 1, 1),
     schedule_interval="@hourly",
     max_active_runs=1,
     default_args={"mysql_conn_id": "local_mysql"},

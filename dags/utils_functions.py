@@ -1,7 +1,7 @@
 import json
 from db_connections import getConnectionLocal
-import _mysql_connector
-from datetime import date
+import datetime
+
 import re
 
 
@@ -29,6 +29,10 @@ def Local_Filter_OverTryFailure(job):
     return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] == 0 and job["numberOfDays"] == 1
 
 
+def BQ_Filter_Stale(job):
+    return (job["status"] == 'running') and ExceededExecutionTime(job) == True
+
+
 def Map_IdJobs(job):
     id = job["job_id"]
     return str(f"'{id}'")
@@ -42,7 +46,8 @@ def Map_ExternalJobs(job):
         "parent_id": job[3],
         "params": job[4],
         "errors": job[5],
-        "credential_id": job[6]
+        "credential_id": job[6],
+        "updated": datetime.datetime.now().strftime('%y-%m-%d %H:%M:%S') if job[7] is None else job[7].strftime('%y-%m-%d %H:%M:%S')
     }
 
 
@@ -65,7 +70,7 @@ def Get_StartDate(_json: str) -> str:
     _dict: dict = json.loads(_json)
     key = "startDate"
     value = ""
-    
+
     if (_dict.__contains__("startDate")):
         value = _dict[key]
 
@@ -103,8 +108,8 @@ def Get_IdCharge(idJob: str):
 def GetNumberOfDaysBetweenTwoDates(d1, d2) -> int:
     _d1 = d1.split("-")
     _d2 = d2.split("-")
-    startDate = date(int(_d1[0]), int(_d1[1]), int(_d1[2]))
-    endDate = date(int(_d2[0]), int(_d2[1]), int(_d2[2]))
+    startDate = datetime.date(int(_d1[0]), int(_d1[1]), int(_d1[2]))
+    endDate = datetime.date(int(_d2[0]), int(_d2[1]), int(_d2[2]))
     differ = endDate - startDate
     return int(differ.days)
 
@@ -115,3 +120,11 @@ def IsErrorInvalidCredential(errorMessage) -> bool:
     regex = re.search(
         "InvalidCredential: This credential is invalid", errorMessage)
     return bool(regex)
+
+
+def ExceededExecutionTime(jobProd: str):
+    updateDate: datetime.datetime = datetime.datetime.strptime(jobProd["updated"], '%y-%m-%d %H:%M:%S')
+    _now = datetime.datetime.now()
+    diff: datetime.timedelta = _now - updateDate
+    # print(job["job_id"] + " - " + str(updateDate) + " - " + str(_now)  +  " - " + str(diff.seconds))
+    return diff.seconds > 43200

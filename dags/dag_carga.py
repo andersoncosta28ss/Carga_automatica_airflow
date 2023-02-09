@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 from airflow import DAG
 from airflow.decorators import task
 from utils_conts import SQL_JOB_DefaultInternalFields
@@ -10,7 +10,7 @@ from airflow.exceptions import AirflowSkipException
 
 with DAG(
     dag_id="3-carga",
-    start_date=datetime(2022, 1, 1),
+    start_date=datetime.datetime(2022, 1, 1),
     schedule_interval="@hourly",
     max_active_runs=1,
     default_args={"mysql_conn_id": "local_mysql"},

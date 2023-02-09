@@ -1,4 +1,4 @@
-from datetime import datetime
+import datetime
 from airflow import DAG
 from airflow.decorators import task
 from airflow.sensors.base import PokeReturnValue
@@ -10,7 +10,7 @@ from api_functions import Local_SplitJob
 
 with DAG(
     dag_id="1-desenvolvimento_atualizar_base_local",
-    start_date=datetime(2022, 1, 1),
+    start_date=datetime.datetime(2022, 1, 1),
     schedule_interval="@hourly",
     max_active_runs=1,
     default_args={"mysql_conn_id": "local_mysql"},

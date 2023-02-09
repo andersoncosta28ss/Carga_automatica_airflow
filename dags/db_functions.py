@@ -1,6 +1,8 @@
 from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
 from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs, GetNumberOfDaysBetweenTwoDates, Get_StartDate, Get_EndDate
 from utils_conts import SQL_JOB_DefaultExternalFields, SQL_JOB_DefaultInternalFields
+import datetime
+
 
 # region Local
 
@@ -37,8 +39,7 @@ def Local_Select_PendingJobs():
     result = []
     db = getConnectionLocal()
     cursor = db.cursor()
-    cursor.execute(
-        f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done') AND isInvalidCredential = false")
+    cursor.execute(f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done') AND isInvalidCredential = false")
     result = cursor.fetchall()
     db.close()
     db.disconnect()
@@ -48,8 +49,7 @@ def Local_Select_PendingJobs():
 def Local_Update_Charge(idCharge, state):
     db = getConnectionLocal()
     cursor = db.cursor()
-    cursor.execute(
-        f"UPDATE charge SET status = '{state}' WHERE id = '{idCharge}'")
+    cursor.execute(f"UPDATE charge SET status = '{state}' WHERE id = '{idCharge}'")
     db.commit()
     db.close()
 
@@ -102,8 +102,7 @@ def Local2_Select_Credentials():
 def Prod_Select_Credentials(envs):
     db = getConnectionProd(envs)
     cursor = db.cursor()
-    cursor.execute(
-        "SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), INTERVAL 10 MINUTE) AND loginvalido = true")
+    cursor.execute("SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), INTERVAL 10 MINUTE) AND loginvalido = true")
     credentials = cursor.fetchall()
     db.close()
     return credentials
@@ -114,7 +113,7 @@ def BQ_Select_JobsByIds(jobs, envs):
     idJobs = ','.join(map(Map_IdJobs, jobs))
     query = f"SELECT {SQL_JOB_DefaultExternalFields} FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})"
     query_job = db.query(query)
-    result = list(map(Map_ExternalJobs, query_job))
+    result = list(map(Map_ExternalJobs, query_job.result()))
     db.close()
     return result
 
