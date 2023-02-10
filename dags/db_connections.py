@@ -2,30 +2,22 @@ import mysql.connector
 from google.cloud import bigquery
 import json
 
-def getConnectionLocal():
-    return mysql.connector.connect(
-        host="host.docker.internal",
-        user="root",
-        password="1234",
-        database="LOCAL2"
-    )
 
-
-def getConnectionLocal2():
+def getConnectionLocal(envs):
     return mysql.connector.connect(
-        host="host.docker.internal",
-        user="root",
-        password="1234",
-        database="bq"
+        host=envs.get("DB_LOCAL_HOST"),
+        user=envs.get("DB_LOCAL_USER"),
+        password=envs.get("DB_LOCAL_PASSWORD"),
+        database=envs.get("DB_LOCAL_DATABASE")
     )
 
 
 def getConnectionProd(envs):
     return mysql.connector.connect(
-        host=envs.get("DB_HOST"),
-        user=envs.get("DB_USER"),
-        password=envs.get("DB_PASSWORD"),
-        database=envs.get("DB_DATABASE_SETTINGS")
+        host=envs.get("DB_SOSSEGO_HOST"),
+        user=envs.get("DB_SOSSEGO_USER"),
+        password=envs.get("DB_SOSSEGO_PASSWORD"),
+        database=envs.get("DB_SOSSEGO_DATABASE")
     )
 
 

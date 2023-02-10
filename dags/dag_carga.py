@@ -6,6 +6,7 @@ from db_functions import Local_Select_PendingCharges, Local_Update_Charge
 from db_connections import getConnectionLocal
 from utils_functions import Local_Filter_Failed, Filter_Queued, Local_Filter_OverTryFailure, Filter_Running, Map_InternalJobs
 from airflow.exceptions import AirflowSkipException
+from airflow.models import Variable
 
 
 with DAG(
@@ -22,7 +23,7 @@ with DAG(
         # return PokeReturnValue(is_done=len(pendingCharges) > 0, xcom_value=pendingCharges)
     @task(task_id="CapturarCargasPendentes")
     def CapturarCargasPendentes():
-        pendingCharges = Local_Select_PendingCharges()
+        pendingCharges = Local_Select_PendingCharges(Variable)
         print("Quantidade de items capturados -> " + str(len(pendingCharges)))
         if(len(pendingCharges) == 0):
             raise AirflowSkipException
@@ -31,7 +32,7 @@ with DAG(
     @task
     def AtualizarACarga(ti=None):
         charges = ti.xcom_pull(task_ids= "CapturarCargasPendentes")
-        db = getConnectionLocal()
+        db = getConnectionLocal(Variable)
         cursor = db.cursor()
         for charge in charges:
             idCharge = charge[0]
@@ -55,7 +56,7 @@ with DAG(
 
             else:
                 state = 'partially_done' if len(jobs_FalhosPorExcessoDeTentativa) > 0 else 'done'
-                Local_Update_Charge(idCharge, state)
+                Local_Update_Charge(idCharge, state, Variable)
         db.close()
 
 

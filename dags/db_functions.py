@@ -1,15 +1,14 @@
-from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
-from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs, GetNumberOfDaysBetweenTwoDates, Get_StartDate, Get_EndDate
+from db_connections import getConnectionLocal, getConnectionProd, getConnectionBQ
+from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs
 from utils_conts import SQL_JOB_Select_DefaultExternalFields, SQL_JOB_Select_DefaultInternalFields
-import datetime
 
 
 # region Local
 
 
-def Local_Filter_Credentials(credentials):
+def Local_Filter_Credentials(credentials, envs):
     credentialsToContinue = []
-    db = getConnectionLocal()
+    db = getConnectionLocal(envs)
     cursor = db.cursor()
     for credential in credentials:
         idCredential = credential[0]
@@ -25,8 +24,8 @@ def Local_Filter_Credentials(credentials):
     return credentialsToContinue
 
 
-def Local_Select_PendingCharges():
-    db = getConnectionLocal()
+def Local_Select_PendingCharges(envs):
+    db = getConnectionLocal(envs)
     cursor = db.cursor()
     query = "SELECT id FROM charge WHERE status = 'running'"
     cursor.execute(query)
@@ -35,9 +34,9 @@ def Local_Select_PendingCharges():
     return idCharges
 
 
-def Local_Select_PendingJobs():
+def Local_Select_PendingJobs(envs):
     result = []
-    db = getConnectionLocal()
+    db = getConnectionLocal(envs)
     cursor = db.cursor()
     cursor.execute(f"SELECT {SQL_JOB_Select_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done') AND isInvalidCredential = false")
     result = cursor.fetchall()
@@ -46,8 +45,8 @@ def Local_Select_PendingJobs():
     return list(map(Map_InternalJobs, result))
 
 
-def Local_Update_Charge(idCharge, state):
-    db = getConnectionLocal()
+def Local_Update_Charge(idCharge, state, envs):
+    db = getConnectionLocal(envs)
     cursor = db.cursor()
     cursor.execute(f"UPDATE charge SET status = '{state}' WHERE id = '{idCharge}'")
     db.commit()
@@ -57,52 +56,13 @@ def Local_Update_Charge(idCharge, state):
 # endregion
 
 
-# region somente para ambiente de desenvolvimento
-
-
-def Local2_Select_JobsByIds(jobs):
-    db = getConnectionLocal2()
-    cursor = db.cursor()
-    idJobs = ','.join(map(Map_IdJobs, jobs))
-    cursor.execute(
-        f"SELECT {SQL_JOB_Select_DefaultExternalFields} FROM job WHERE job_id IN ({idJobs})")
-    result = cursor.fetchall()
-    cursor = db.cursor()
-    db.close()
-    return list(map(Map_ExternalJobs, result))
-
-
-def Local2_Select_JobsChildrenByIdParent(jobs):
-    result = []
-    db = getConnectionLocal2()
-    cursor = db.cursor()
-    idJobs = ','.join(map(Map_IdJobs, jobs))
-    if (len(idJobs) > 0):
-        cursor.execute(
-            f"SELECT {SQL_JOB_Select_DefaultExternalFields} FROM job WHERE parent_id IN ({idJobs})")
-        result = cursor.fetchall()
-    db.close()
-    return list(map(Map_ExternalJobs, result))
-
-
-def Local2_Select_Credentials():
-    db = getConnectionLocal2()
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT id FROM credential WHERE create_at >= DATE_SUB(NOW(), interval 30 SECOND)")
-    credentials = cursor.fetchall()
-    db.close()
-    return credentials
-# endregion
-
-
 # region Prod & BQ
 
 
 def Prod_Select_Credentials(envs):
     db = getConnectionProd(envs)
     cursor = db.cursor()
-    cursor.execute("SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), INTERVAL 10 MINUTE) AND loginvalido = true")
+    cursor.execute("SELECT id FROM corretoras_senhas WHERE created >= DATE_SUB(NOW(), INTERVAL 2 HOUR) AND loginvalido = true")
     credentials = cursor.fetchall()
     db.close()
     return credentials

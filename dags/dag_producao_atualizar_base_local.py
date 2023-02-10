@@ -22,7 +22,7 @@ with DAG(
 ) as dag:
     @task(task_id="CapturarJobsPendentes")
     def CapturarJobsPendentes():
-        pendingJobs = Local_Select_PendingJobs()
+        pendingJobs = Local_Select_PendingJobs(Variable)
         print("Quantidade de items capturados -> " + str(len(pendingJobs)))
         if (len(pendingJobs) == 0):
             raise AirflowSkipException

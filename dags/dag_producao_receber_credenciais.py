@@ -25,7 +25,7 @@ with DAG(
     @task(task_id="VerificarSeExisteCredencialNova")
     def VerificarSeExisteCredencialNova():
         credenciais = Prod_Select_Credentials(Variable)
-        credenciais = Local_Filter_Credentials(credenciais)
+        credenciais = Local_Filter_Credentials(credenciais, Variable)
         print("Quantidade de items capturados -> " + str(len(credenciais)))
         if(len(credenciais) == 0):
             raise AirflowSkipException
