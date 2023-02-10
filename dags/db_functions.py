@@ -111,7 +111,7 @@ def Prod_Select_Credentials(envs):
 def BQ_Select_JobsByIds(jobs, envs):
     db = getConnectionBQ(envs)
     idJobs = ','.join(map(Map_IdJobs, jobs))
-    query = f"SELECT {SQL_JOB_DefaultExternalFields} FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})"
+    query = f"SELECT {SQL_JOB_DefaultExternalFields}, updated FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})"
     query_job = db.query(query)
     result = list(map(Map_ExternalJobs, query_job.result()))
     db.close()

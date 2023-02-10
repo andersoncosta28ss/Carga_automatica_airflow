@@ -26,7 +26,7 @@ def Local_Filter_Failed(job):
 
 
 def Local_Filter_OverTryFailure(job):
-    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] == 0 and job["numberOfDays"] == 1
+    return (job["status"] == 'failed' or job["status"] == 'timeout' or job["status"] == 'stale') and job["retries"] == 0 and job["numberOfDays"] == 1
 
 
 def BQ_Filter_Stale(job):
