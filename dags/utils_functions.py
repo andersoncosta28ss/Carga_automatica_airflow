@@ -1,36 +1,37 @@
 import json
 from db_connections import getConnectionLocal
 import datetime
+from utils_conts import JobStatus
 
 import re
 
 
 def Filter_Queued(job):
-    return job["status"] == 'queued'
+    return job["status"] == JobStatus.Queued.value 
 
 
 def Filter_Running(job):
-    return job["status"] == 'running'
+    return job["status"] == JobStatus.Running.value 
 
 
 def BQ_Filter_Failed(job):
-    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] > 0
+    return (job["status"] == JobStatus.Failed.value or job["status"] == JobStatus.Timeout.value) and job["retries"] > 0
 
 
 def BQ_Filter_OverTryFailure(job):
-    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] == 0
+    return (job["status"] == JobStatus.Failed.value or job["status"] == JobStatus.Timeout.value) and job["retries"] == 0
 
 
 def Local_Filter_Failed(job):
-    return (job["status"] == 'failed' or job["status"] == 'timeout') and job["retries"] > 0 and job["was_sent"] == False and job["numberOfDay"] > 1
+    return (job["status"] == JobStatus.Failed.value or job["status"] == JobStatus.Timeout.value) and job["retries"] > 0 and job["was_sent"] == False and job["numberOfDay"] > 1
 
 
 def Local_Filter_OverTryFailure(job):
-    return (job["status"] == 'failed' or job["status"] == 'timeout' or job["status"] == 'stale') and job["retries"] == 0 and job["numberOfDays"] == 1
+    return (job["status"] == JobStatus.Failed.value or job["status"] == JobStatus.Timeout.value or job["status"] == 'stale') and job["retries"] == 0 and job["numberOfDays"] == 1
 
 
 def BQ_Filter_Stale(job):
-    return (job["status"] == 'running') and ExceededExecutionTime(job) == True
+    return (job["status"] == JobStatus.Running.value) and ExceededExecutionTime(job) == True
 
 
 def Map_IdJobs(job):

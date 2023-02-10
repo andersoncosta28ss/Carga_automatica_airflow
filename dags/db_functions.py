@@ -1,7 +1,6 @@
 from db_connections import getConnectionLocal, getConnectionProd, getConnectionBQ
 from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs
-from utils_conts import SQL_JOB_Select_DefaultExternalFields, SQL_JOB_Select_DefaultInternalFields
-
+from utils_conts import SQL_JOB_Select_DefaultExternalFields, JobStatus, SQL_JOB_Select_DefaultInternalFields, ChargeStatus
 
 # region Local
 
@@ -27,7 +26,8 @@ def Local_Filter_Credentials(credentials, envs):
 def Local_Select_PendingCharges(envs):
     db = getConnectionLocal(envs)
     cursor = db.cursor()
-    query = "SELECT id FROM charge WHERE status = 'running'"
+    query = f"SELECT id FROM charge WHERE status = '{ChargeStatus.Running.value}'"
+    print(query)
     cursor.execute(query)
     idCharges = cursor.fetchall()
     db.close()
@@ -38,7 +38,7 @@ def Local_Select_PendingJobs(envs):
     result = []
     db = getConnectionLocal(envs)
     cursor = db.cursor()
-    cursor.execute(f"SELECT {SQL_JOB_Select_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done') AND isInvalidCredential = false")
+    cursor.execute(f"SELECT {SQL_JOB_Select_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('{JobStatus.Done.value}') AND isInvalidCredential = false")
     result = cursor.fetchall()
     db.close()
     db.disconnect()
@@ -48,7 +48,8 @@ def Local_Select_PendingJobs(envs):
 def Local_Update_Charge(idCharge, state, envs):
     db = getConnectionLocal(envs)
     cursor = db.cursor()
-    cursor.execute(f"UPDATE charge SET status = '{state}' WHERE id = '{idCharge}'")
+    query = f"UPDATE charge SET status = '{state}' WHERE id = '{idCharge}'"
+    cursor.execute(query)
     db.commit()
     db.close()
 

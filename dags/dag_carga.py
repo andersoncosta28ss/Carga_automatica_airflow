@@ -7,7 +7,7 @@ from db_connections import getConnectionLocal
 from utils_functions import Local_Filter_Failed, Filter_Queued, Local_Filter_OverTryFailure, Filter_Running, Map_InternalJobs
 from airflow.exceptions import AirflowSkipException
 from airflow.models import Variable
-
+from utils_conts import ChargeStatus, JobStatus
 
 with DAG(
     dag_id="3-carga",
@@ -36,7 +36,7 @@ with DAG(
         cursor = db.cursor()
         for charge in charges:
             idCharge = charge[0]
-            query = f"SELECT {SQL_JOB_Select_DefaultInternalFields} FROM job WHERE charge_id = '{idCharge}' AND status <> 'done'"
+            query = f"SELECT {SQL_JOB_Select_DefaultInternalFields} FROM job WHERE charge_id = '{idCharge}' AND status <> '{JobStatus.Done.value}'"
             cursor.execute(query)
             result = cursor.fetchall()
             result = list(map(Map_InternalJobs, result))
@@ -55,7 +55,7 @@ with DAG(
                 continue
 
             else:
-                state = 'partially_done' if len(jobs_FalhosPorExcessoDeTentativa) > 0 else 'done'
+                state = ChargeStatus.Partially_Done.value if len(jobs_FalhosPorExcessoDeTentativa) > 0 else ChargeStatus.Done.value
                 Local_Update_Charge(idCharge, state, Variable)
         db.close()
 
