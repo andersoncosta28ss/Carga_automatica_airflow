@@ -1,7 +1,7 @@
 import datetime
 from airflow import DAG
 from airflow.decorators import task
-from utils_conts import SQL_JOB_DefaultInternalFields
+from utils_conts import SQL_JOB_Select_DefaultInternalFields
 from db_functions import Local_Select_PendingCharges, Local_Update_Charge
 from db_connections import getConnectionLocal
 from utils_functions import Local_Filter_Failed, Filter_Queued, Local_Filter_OverTryFailure, Filter_Running, Map_InternalJobs
@@ -35,7 +35,7 @@ with DAG(
         cursor = db.cursor()
         for charge in charges:
             idCharge = charge[0]
-            query = f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE charge_id = '{idCharge}' AND status <> 'done'"
+            query = f"SELECT {SQL_JOB_Select_DefaultInternalFields} FROM job WHERE charge_id = '{idCharge}' AND status <> 'done'"
             cursor.execute(query)
             result = cursor.fetchall()
             result = list(map(Map_InternalJobs, result))

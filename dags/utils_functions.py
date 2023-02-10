@@ -47,7 +47,7 @@ def Map_ExternalJobs(job):
         "params": job[4],
         "errors": job[5],
         "credential_id": job[6],
-        "updated": datetime.datetime.now().strftime('%y-%m-%d %H:%M:%S') if job[7] is None else job[7].strftime('%y-%m-%d %H:%M:%S')
+        "updated": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') if job[7] is None else job[7].strftime('%Y-%m-%d %H:%M:%S')
     }
 
 
@@ -123,7 +123,7 @@ def IsErrorInvalidCredential(errorMessage) -> bool:
 
 
 def ExceededExecutionTime(jobProd: str):
-    updateDate: datetime.datetime = datetime.datetime.strptime(jobProd["updated"], '%y-%m-%d %H:%M:%S')
+    updateDate: datetime.datetime = datetime.datetime.strptime(jobProd["updated"], '%Y-%m-%d %H:%M:%S')
     _now = datetime.datetime.now()
     diff: datetime.timedelta = _now - updateDate
     # print(job["job_id"] + " - " + str(updateDate) + " - " + str(_now)  +  " - " + str(diff.seconds))

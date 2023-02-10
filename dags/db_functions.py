@@ -1,6 +1,6 @@
 from db_connections import getConnectionLocal, getConnectionLocal2, getConnectionProd, getConnectionBQ
 from utils_functions import Map_IdJobs, Map_ExternalJobs, Map_InternalJobs, GetNumberOfDaysBetweenTwoDates, Get_StartDate, Get_EndDate
-from utils_conts import SQL_JOB_DefaultExternalFields, SQL_JOB_DefaultInternalFields
+from utils_conts import SQL_JOB_Select_DefaultExternalFields, SQL_JOB_Select_DefaultInternalFields
 import datetime
 
 
@@ -39,7 +39,7 @@ def Local_Select_PendingJobs():
     result = []
     db = getConnectionLocal()
     cursor = db.cursor()
-    cursor.execute(f"SELECT {SQL_JOB_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done') AND isInvalidCredential = false")
+    cursor.execute(f"SELECT {SQL_JOB_Select_DefaultInternalFields} FROM job WHERE was_sent = false AND status NOT IN('done') AND isInvalidCredential = false")
     result = cursor.fetchall()
     db.close()
     db.disconnect()
@@ -65,7 +65,7 @@ def Local2_Select_JobsByIds(jobs):
     cursor = db.cursor()
     idJobs = ','.join(map(Map_IdJobs, jobs))
     cursor.execute(
-        f"SELECT {SQL_JOB_DefaultExternalFields} FROM job WHERE job_id IN ({idJobs})")
+        f"SELECT {SQL_JOB_Select_DefaultExternalFields} FROM job WHERE job_id IN ({idJobs})")
     result = cursor.fetchall()
     cursor = db.cursor()
     db.close()
@@ -79,7 +79,7 @@ def Local2_Select_JobsChildrenByIdParent(jobs):
     idJobs = ','.join(map(Map_IdJobs, jobs))
     if (len(idJobs) > 0):
         cursor.execute(
-            f"SELECT {SQL_JOB_DefaultExternalFields} FROM job WHERE parent_id IN ({idJobs})")
+            f"SELECT {SQL_JOB_Select_DefaultExternalFields} FROM job WHERE parent_id IN ({idJobs})")
         result = cursor.fetchall()
     db.close()
     return list(map(Map_ExternalJobs, result))
@@ -111,7 +111,7 @@ def Prod_Select_Credentials(envs):
 def BQ_Select_JobsByIds(jobs, envs):
     db = getConnectionBQ(envs)
     idJobs = ','.join(map(Map_IdJobs, jobs))
-    query = f"SELECT {SQL_JOB_DefaultExternalFields}, updated FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})"
+    query = f"SELECT {SQL_JOB_Select_DefaultExternalFields} FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE job_id IN ({idJobs})"
     query_job = db.query(query)
     result = list(map(Map_ExternalJobs, query_job.result()))
     db.close()
@@ -123,7 +123,7 @@ def BQ_Select_JobsChildrenByIdParent(jobs, envs):
     db = getConnectionBQ(envs)
     idJobs = ','.join(map(Map_IdJobs, jobs))
     if (len(idJobs) > 0):
-        query = f"SELECT {SQL_JOB_DefaultExternalFields} FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE parent_id IN ({idJobs})"
+        query = f"SELECT {SQL_JOB_Select_DefaultExternalFields} FROM sossego-data-bi-stage.sossegobot.sbot_jobs WHERE parent_id IN ({idJobs})"
         query_job = db.query(query)
         result = list(map(Map_ExternalJobs, query_job))
     db.close()

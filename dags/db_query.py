@@ -1,5 +1,5 @@
 from utils_functions import Get_IdCharge, IsErrorInvalidCredential
-from utils_conts import SQL_JOB_DefaultExternalFields
+from utils_conts import SQL_JOB_Select_DefaultExternalFields, SQL_JOB_Insert_DefaultInternalFields
 import json
 from utils_functions import Get_EndDate, Get_StartDate, Get_IdCharge, GetNumberOfDaysBetweenTwoDates
 import datetime
@@ -22,7 +22,7 @@ def Query_Local_Insert_ChildrenJob(jobs):
         credential_id = job["credential_id"]
         charge_id = Get_IdCharge(parent_id)
         query += f"""
-                    INSERT INTO job({SQL_JOB_DefaultExternalFields}, charge_id) VALUES('{id}','{status}', {retries}, '{parent_id}', {params}, '{errors}', '{credential_id}' ,'{charge_id}');
+                    INSERT INTO job({SQL_JOB_Insert_DefaultInternalFields}) VALUES('{id}','{status}', {retries}, '{parent_id}', {params}, '{errors}', '{credential_id}' ,'{charge_id}');
                     UPDATE job SET was_sent = true WHERE job_id = '{parent_id}';
         """
     return query
