@@ -96,8 +96,8 @@ def Get_EndDate(_json: str) -> str:
     return {"str": f'"{key}": "{value}"', "key": key, "value": value}
 
 
-def Get_IdCharge(idJob: str):
-    db = getConnectionLocal()
+def Get_IdCharge(idJob: str, envs):
+    db = getConnectionLocal(envs)
     cursor = db.cursor()
     cursor.execute(
         f"SELECT charge_id FROM job WHERE job_id = '{idJob}'")

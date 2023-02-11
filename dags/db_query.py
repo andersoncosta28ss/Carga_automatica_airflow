@@ -8,7 +8,7 @@ import datetime
 # region Local
 
 
-def Query_Local_Insert_ChildrenJob(jobs):
+def Query_Local_Insert_ChildrenJob(jobs, envs):
     query = ""
     if (len(jobs) == 0):
         return "SELECT 0"
@@ -23,7 +23,7 @@ def Query_Local_Insert_ChildrenJob(jobs):
         endDate = Get_EndDate(params)
         numberOfDays = int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]))
         credential_id = job["credential_id"]
-        charge_id = Get_IdCharge(parent_id)
+        charge_id = Get_IdCharge(parent_id, envs)
         query += f"""
                     INSERT INTO job({SQL_JOB_Insert_DefaultInternalFields}) VALUES('{id}','{status}', {retries}, '{parent_id}', {json.dumps(params)}, '{errors}', '{credential_id}' ,'{charge_id}', {numberOfDays});
                     UPDATE job SET was_sent = true WHERE job_id = '{parent_id}';

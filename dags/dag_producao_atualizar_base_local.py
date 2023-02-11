@@ -67,7 +67,7 @@ with DAG(
             task_ids="QuebrarOsPeriodosDosJobsQueFalharam")
 
         ti.xcom_push(key="SQL_INSERT_CHILDRENJOBS",
-                     value=Query_Local_Insert_ChildrenJob(childrenJobs))
+                     value=Query_Local_Insert_ChildrenJob(childrenJobs, Variable))
         ti.xcom_push(key="SQL_UPDATE_JOBS",
                      value=Query_Local_Update_Job(jobsProd))
         ti.xcom_push(key="SQL_INSERT_SPLITED_JOBS",
