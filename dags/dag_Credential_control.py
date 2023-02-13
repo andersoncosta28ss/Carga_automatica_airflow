@@ -10,7 +10,7 @@ from airflow.exceptions import AirflowSkipException
 
 
 with DAG(
-    dag_id="2-producao_receber_credenciais",
+    dag_id="2-Credential_control",
     start_date=datetime.datetime(2022, 1, 1),
     schedule_interval="@hourly",
     max_active_runs=1,
@@ -19,11 +19,8 @@ with DAG(
     catchup=False
 ) as dag:
 
-    # @task.sensor(poke_interval=_1min, timeout=_1min * 5, mode="reschedule", soft_fail=True, task_id="Sensor_VerificarSeExisteCredencialNova")
-    # def Sensor_VerificarSeExisteCredencialNova() -> PokeReturnValue:
-        # return PokeReturnValue(is_done=len(credenciais) > 0, xcom_value=credenciais)
-    @task(task_id="VerificarSeExisteCredencialNova")
-    def VerificarSeExisteCredencialNova():
+    @task(task_id="CheckIfNewCredentialExists")
+    def CheckIfNewCredentialExists():
         credenciais = Prod_Select_Credentials(Variable)
         credenciais = Local_Filter_Credentials(credenciais, Variable)
         print("Quantidade de items capturados -> " + str(len(credenciais)))
@@ -32,9 +29,9 @@ with DAG(
         else:
             return credenciais
 
-    @task(task_id="Enviar_Para_RoberthAPI")
-    def Enviar_Para_RoberthAPI(ti=None):
-        credenciais = ti.xcom_pull(task_ids="VerificarSeExisteCredencialNova")
+    @task(task_id="Submit_To_RobethAPI")
+    def Submit_To_RobethAPI(ti=None):
+        credenciais = ti.xcom_pull(task_ids="CheckIfNewCredentialExists")
         result = Prod_SendToAPI(credenciais, Variable)
         ti.xcom_push(key="SQL_INSERT_CHARGE", value=Query_Local_Insert_Charge(result))
         return result
@@ -45,4 +42,4 @@ with DAG(
         dag=dag,
     )
 
-    VerificarSeExisteCredencialNova() >> Enviar_Para_RoberthAPI() >> mysql_task
+    CheckIfNewCredentialExists() >> Submit_To_RobethAPI() >> mysql_task

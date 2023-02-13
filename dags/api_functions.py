@@ -57,7 +57,7 @@ def Prod_SendToAPI(idCredentials, envs):
             "retries": 1,
             "credentialId": idCredential,
             "priority": "normal",
-            "procedure": [{"script": "{insurer}/contract-fetch", "params": {"pastDays":  365, "splitDayInterval": 30}}]
+            "procedure": [{"script": "{insurer}/contract-fetch", "params": {"pastDays":  2}}]
         })
         response = requests.request("POST", url=envs.get("API_URL"), headers={
             "Authorization": envs.get("API_AUTHORIZATION"),
@@ -137,7 +137,7 @@ def Prod_SendStaleJob(staleJobs, envs):
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
 
-        idCharge = Get_IdCharge(id)
+        idCharge = Get_IdCharge(id, envs)
         params = {
             "startDate": startDate["value"],
             "endDate": endDate["value"]

@@ -1,8 +1,7 @@
 from utils_functions import Get_IdCharge, IsErrorInvalidCredential
-from utils_conts import SQL_JOB_Select_DefaultExternalFields, SQL_JOB_Insert_DefaultInternalFields
+from utils_conts import SQL_JOB_Insert_DefaultInternalFields
 import json
-from utils_functions import Get_EndDate, Get_StartDate, Get_IdCharge, GetNumberOfDaysBetweenTwoDates
-import datetime
+from utils_functions import Get_EndDate, Get_StartDate, Get_IdCharge, GetNumberOfDaysBetweenTwoDates, GetErrors
 
 
 # region Local
@@ -18,7 +17,7 @@ def Query_Local_Insert_ChildrenJob(jobs, envs):
         retries = job["retries"]
         parent_id = "" if job["parent_id"] is None else job["parent_id"]
         params = job["params"]
-        errors = "" if job["errors"] is None else str(job["errors"]).split("\n")[0].replace("'", '"')
+        errors = GetErrors(job["errors"])
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
         numberOfDays = int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]))
@@ -45,7 +44,7 @@ def Query_Local_Update_Job(jobs):
         startDate = Get_StartDate(params)
         endDate = Get_EndDate(params)
         numberOfDays = int(GetNumberOfDaysBetweenTwoDates(startDate["value"], endDate["value"]))
-        errors = "" if job["errors"] is None else str(job["errors"]).split("\n")[0].replace("'", '"')
+        errors = GetErrors(job["errors"])
         isInvalidCredential = IsErrorInvalidCredential(errors)
         query += f"UPDATE job SET status = '{status}', retries = {retries}, parent_id = '{parent_id}', params = {json.dumps(params)}, errors = '{errors}', isInvalidCredential = {isInvalidCredential}, credential_id = {credential_id}, numberOfDays = {numberOfDays} WHERE job_id = '{id}';"
     return query

@@ -127,5 +127,7 @@ def ExceededExecutionTime(jobProd: str):
     updateDate: datetime.datetime = datetime.datetime.strptime(jobProd["updated"], '%Y-%m-%d %H:%M:%S')
     _now = datetime.datetime.now()
     diff: datetime.timedelta = _now - updateDate
-    # print(job["job_id"] + " - " + str(updateDate) + " - " + str(_now)  +  " - " + str(diff.seconds))
     return diff.seconds > 43200
+
+def GetErrors(error: str) -> str:
+    return "" if error is None else str(error).split("\n")[0].replace("'", '"')[:255][0]

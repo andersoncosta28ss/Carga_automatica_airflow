@@ -10,7 +10,7 @@ from airflow.models import Variable
 from utils_conts import ChargeStatus, JobStatus
 
 with DAG(
-    dag_id="3-carga",
+    dag_id="3-Charge_control",
     start_date=datetime.datetime(2022, 1, 1),
     schedule_interval="@hourly",
     max_active_runs=1,
@@ -18,11 +18,8 @@ with DAG(
     render_template_as_native_obj=True,
     catchup=False
 ) as dag:
-    # @task.sensor(poke_interval=_1min, timeout=_1min * 5, mode="reschedule", soft_fail=True, task_id="Sensor_CapturarCargasPendentes")
-    # def Sensor_CapturarCargasPendentes() -> PokeReturnValue:
-        # return PokeReturnValue(is_done=len(pendingCharges) > 0, xcom_value=pendingCharges)
-    @task(task_id="CapturarCargasPendentes")
-    def CapturarCargasPendentes():
+    @task(task_id="CapturePendingCharges")
+    def CapturePendingCharges():
         pendingCharges = Local_Select_PendingCharges(Variable)
         print("Quantidade de items capturados -> " + str(len(pendingCharges)))
         if(len(pendingCharges) == 0):
@@ -30,8 +27,8 @@ with DAG(
         return pendingCharges
 
     @task
-    def AtualizarACarga(ti=None):
-        charges = ti.xcom_pull(task_ids= "CapturarCargasPendentes")
+    def UpdateCharges(ti=None):
+        charges = ti.xcom_pull(task_ids= "CapturePendingCharges")
         db = getConnectionLocal(Variable)
         cursor = db.cursor()
         for charge in charges:
@@ -40,26 +37,26 @@ with DAG(
             cursor.execute(query)
             result = cursor.fetchall()
             result = list(map(Map_InternalJobs, result))
-            jobs_EmFila = list(filter(Filter_Queued, result))
-            jobs_Falhos = list(filter(Local_Filter_Failed, result))
-            jobs_FalhosPorExcessoDeTentativa = list(filter(Local_Filter_OverTryFailure, result))
-            jobs_Rodando = list(filter(Filter_Running, result))
-            jobs_pendentes = len(jobs_EmFila) > 0 or len(jobs_Falhos) > 0 or len(jobs_Rodando) > 0
+            jobs_queued = list(filter(Filter_Queued, result))
+            jobs_failed = list(filter(Local_Filter_Failed, result))
+            jobs_overTryFailure = list(filter(Local_Filter_OverTryFailure, result))
+            jobs_running = list(filter(Filter_Running, result))
+            jobs_pending = len(jobs_queued) > 0 or len(jobs_failed) > 0 or len(jobs_running) > 0
             print("id carga -> " + str(idCharge))
-            print("Quantidade de Jobs em fila -> " + str(len(jobs_EmFila)))
-            print("Quantidade de Jobs falhos -> " + str(len(jobs_Falhos)))
-            print("Quantidade de Jobs falhos por excesso -> " + str(len(jobs_FalhosPorExcessoDeTentativa)))
-            print("Quantidade de Jobs running -> " + str(len(jobs_Rodando)))
-            print("Quantidade de Jobs pendentes -> " + str(jobs_pendentes))
-            if (jobs_pendentes):
+            print("Quantidade de Jobs em fila -> " + str(len(jobs_queued)))
+            print("Quantidade de Jobs falhos -> " + str(len(jobs_failed)))
+            print("Quantidade de Jobs falhos por excesso -> " + str(len(jobs_overTryFailure)))
+            print("Quantidade de Jobs running -> " + str(len(jobs_running)))
+            print("Quantidade de Jobs pendentes -> " + str(jobs_pending))
+            if jobs_pending:
                 continue
 
             else:
-                state = ChargeStatus.Partially_Done.value if len(jobs_FalhosPorExcessoDeTentativa) > 0 else ChargeStatus.Done.value
+                state = ChargeStatus.Partially_Done.value if len(jobs_overTryFailure) > 0 else ChargeStatus.Done.value
                 Local_Update_Charge(idCharge, state, Variable)
         db.close()
 
 
-    CapturarCargasPendentes() >> AtualizarACarga()
+    CapturePendingCharges() >> UpdateCharges()
 
     

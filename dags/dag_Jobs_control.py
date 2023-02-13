@@ -12,16 +12,16 @@ from airflow.exceptions import AirflowSkipException
 
 
 with DAG(
-    dag_id="1-producao_atualizar_base_local",
+    dag_id="1-Jobs_Control",
     start_date=datetime.datetime(2022, 1, 1),
     schedule_interval="@hourly",
     max_active_runs=1,
     default_args={"mysql_conn_id": "local_mysql"},
     render_template_as_native_obj=True,
-    catchup=False
+    catchup=False 
 ) as dag:
-    @task(task_id="CapturarJobsPendentes")
-    def CapturarJobsPendentes():
+    @task(task_id="CapturePendingJobs")
+    def CapturePendingJobs():
         pendingJobs = Local_Select_PendingJobs(Variable)
         print("Quantidade de items capturados -> " + str(len(pendingJobs)))
         if (len(pendingJobs) == 0):
@@ -29,9 +29,9 @@ with DAG(
         else:
             return pendingJobs
 
-    @task(task_id="PegarJobsPendentesNaBigQuery")
-    def PegarJobsPendentesNaBigQuery(ti=None):
-        pendingJobs = ti.xcom_pull(task_ids="CapturarJobsPendentes")
+    @task(task_id="GetPendingJobsInBigQuery")
+    def GetPendingJobsInBigQuery(ti=None):
+        pendingJobs = ti.xcom_pull(task_ids="CapturePendingJobs")
         _pendingJobs = BQ_Select_JobsByIds(pendingJobs, Variable)
         failedJobs = list(filter(BQ_Filter_Failed, _pendingJobs))        
         jobsOverTryFailure = list(filter(BQ_Filter_OverTryFailure, _pendingJobs))
@@ -42,29 +42,29 @@ with DAG(
         ti.xcom_push(key="JobsOverTryFailure", value=jobsOverTryFailure)
         return _pendingJobs
 
-    @task(task_id="PegarJobsFilhosNaBigQuery")
-    def PegarJobsFilhosNaBigQuery(ti=None):
+    @task(task_id="GetChildJobsInBigQuery")
+    def GetChildJobsInBigQuery(ti=None):
         FailedJobs = ti.xcom_pull(key="FailedJobs")
         return BQ_Select_JobsChildrenByIdParent(FailedJobs, Variable)
 
-    @task(task_id="QuebrarOsPeriodosDosJobsQueFalharam")
-    def QuebrarOsPeriodosDosJobsQueFalharam(ti=None):
+    @task(task_id="BreakPeriodsofFailedJobs")
+    def BreakPeriodsofFailedJobs(ti=None):
         FailedJobs = ti.xcom_pull(key="JobsOverTryFailure")
         newJobs = Prod_SplitJob(FailedJobs, Variable)
         return newJobs
 
-    @task(task_id="EnviarJobsEmStale")
-    def EnviarJobsEmStale(ti=None):
+    @task(task_id="SubmitJobsInStale")
+    def SubmitJobsInStale(ti=None):
         staleJobs = ti.xcom_pull(key="StaleJobs")
         return Prod_SendStaleJob(staleJobs, Variable)
 
     @task
-    def PrepararSQLs(ti=None):
-        jobsProd = ti.xcom_pull(task_ids="PegarJobsPendentesNaBigQuery")
-        childrenJobs = ti.xcom_pull(task_ids="PegarJobsFilhosNaBigQuery")
-        staleJobs = ti.xcom_pull(task_ids="EnviarJobsEmStale")
+    def PrepareSQLs(ti=None):
+        jobsProd = ti.xcom_pull(task_ids="GetPendingJobsInBigQuery")
+        childrenJobs = ti.xcom_pull(task_ids="GetChildJobsInBigQuery")
+        staleJobs = ti.xcom_pull(task_ids="SubmitJobsInStale")
         splitedJobs = ti.xcom_pull(
-            task_ids="QuebrarOsPeriodosDosJobsQueFalharam")
+            task_ids="BreakPeriodsofFailedJobs")
 
         ti.xcom_push(key="SQL_INSERT_CHILDRENJOBS",
                      value=Query_Local_Insert_ChildrenJob(childrenJobs, Variable))
@@ -75,28 +75,28 @@ with DAG(
         ti.xcom_push(key="SQL_UPDATE_STALE_JOBS",
                      value=Query_Local_Update_Stale_Jobs(staleJobs))
 
-    InserirJobsFilhos = MySqlOperator(
-        task_id="MYSQL_InserirJobsFilhos",
+    InsertChildJobs = MySqlOperator(
+        task_id="MYSQL_InsertChildJobs",
         sql="{{ti.xcom_pull(key='SQL_INSERT_CHILDRENJOBS')}}",
         dag=dag
     )
 
-    AtualizarJobs = MySqlOperator(
-        task_id="MYSQL_AtualizarJobs",
+    UpdateJobs = MySqlOperator(
+        task_id="MYSQL_UpdateJobs",
         sql="{{ti.xcom_pull(key='SQL_UPDATE_JOBS')}}",
         dag=dag
     )
 
-    InserirJobsComPeriodosQuebrados = MySqlOperator(
-        task_id="MYSQL_InserirJobsComPeriodosQuebrados",
+    InsertJobsWithBrokenPeriods = MySqlOperator(
+        task_id="MYSQL_InsertJobsWithBrokenPeriods",
         sql="{{ti.xcom_pull(key='SQL_INSERT_SPLITED_JOBS')}}",
         dag=dag
     )
 
-    AtualizarJobsStale = MySqlOperator(
-        task_id="MYSQL_AtualizarJobsStale",
+    UpdateJobsStale = MySqlOperator(
+        task_id="MYSQL_UpdateJobsStale",
         sql="{{ti.xcom_pull(key='SQL_UPDATE_STALE_JOBS')}}",
         dag=dag
     )
-    CapturarJobsPendentes() >> PegarJobsPendentesNaBigQuery(
-    ) >> PegarJobsFilhosNaBigQuery() >> QuebrarOsPeriodosDosJobsQueFalharam() >> EnviarJobsEmStale() >> PrepararSQLs() >> InserirJobsFilhos >> AtualizarJobs >> InserirJobsComPeriodosQuebrados >> AtualizarJobsStale
+    CapturePendingJobs() >> GetPendingJobsInBigQuery(
+    ) >> GetChildJobsInBigQuery() >> BreakPeriodsofFailedJobs() >> SubmitJobsInStale() >> PrepareSQLs() >> InsertChildJobs >> UpdateJobs >> InsertJobsWithBrokenPeriods >> UpdateJobsStale
